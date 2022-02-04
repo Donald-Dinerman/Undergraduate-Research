@@ -1,0 +1,73 @@
+---
+title: "Undergraduate Research"
+author: "Donald Dinerman"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Using Data to Support Students
+
+## Project Description
+
+The Statistics & Data Science Advising team wants to use data to better support students. Using anonymized course performance data, your team will assess and seek to answer numerous questions. The dataset will include course final grades for courses Statistics & Data Science graduates have taken over the past several (approximately 6) years. Data will include a student identifier, courses taken, final grades in courses, the class level of the student when they took the course, student major when they took the course, and the semester the courses were taken. 
+
+## Read Data
+
+```{r, include=F}
+#Load libraries
+
+library(dplyr)
+```
+
+```{r}
+stat_df = read.csv("stats_data.csv")
+head(stat_df,10)
+```
+
+Questions:
+
+1. For first enrolled, I assume F and S are Fall and Spring. But what is M?
+
+2. For major, what is H00?
+
+3. What does class_id signify?
+
+4. What is M and N for semester?
+
+5. There are instances where first enroll happens after the course semester. Does this mean the student enrolled after they took the course, what's up with that?
+
+6. How to designate pre-reqs?
+
+7. How to identify electives and core classes?
+
+## Prep Data
+
+```{r}
+#create var designating semester and relative year (e.g., Freshman Fall 2020, Junior Spring 2019)
+#use regex to sparse through first_enrolled and semester
+#not as simple as subtracting (how to id transfers)
+
+#when enroll in fall and class is in spring, need to add something to classify they haven't shifted class (e.g., freshmen, sophomore)
+char_remover = function(x){gsub("[^0-9.-]", "", x) %>% as.numeric()}
+
+sem = char_remover(stat_df$semester) - char_remover(stat_df$first_enrolled)
+
+#instances where first enroll date > semester date (weird, need explanation)
+stat_df[which(sem < 0),]
+```
+
+```{r}
+#filter out non-majors (H00: undeclared)
+declared_stat_df = stat_df %>%
+  filter(major != "H00")
+```
+
+## EDA
+
+```{r}
+#popular electives by major
+```
+
