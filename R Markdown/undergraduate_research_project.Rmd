@@ -50,12 +50,11 @@ Questions:
 #use regex to sparse through first_enrolled and semester
 #not as simple as subtracting (how to id transfers)
 
-#when enroll in fall and class is in spring, need to add something to classify they haven't shifted class (e.g., freshmen, sophomore)
 char_remover = function(x){gsub("[^0-9.-]", "", x) %>% as.numeric()}
 
 sem = char_remover(stat_df$semester) - char_remover(stat_df$first_enrolled)
 
-#instances where first enroll date > semester date (weird, need explanation)
+#instances where first enroll date > semester date (weird, need explanation) (119 students) 
 stat_df[which(sem < 0),] %>% head(5)
 ```
 
@@ -136,7 +135,7 @@ test = merged_df %>% #to get students in course by major
 percentage_course_by_major = left_join(test, hold, "major") %>%
   mutate(prop = round((n_course/count)*100, 2)) %>%
   group_by(major) %>%
-  top_n(n = 5, wt = prop) %>%
+  slice_max(n = 3, order_by = prop, with_ties = F) %>%
   arrange(major, -prop)
 
 head(percentage_course_by_major, 5)
@@ -144,8 +143,8 @@ head(percentage_course_by_major, 5)
 
 ```{r}
 #remove grad classes
-#keep 10-xxx
-#remove xx-600 >
+#(1) keep 10-xxx, (2) remove xx-600 >
+#######Issue: Master courses and other omitted courses still feed into units carried, GPA
 
 #identify xx-600 >
 index_1 = grepl("^..[6-9]", merged_df$course)
@@ -153,7 +152,6 @@ index_1 = grepl("^..[6-9]", merged_df$course)
 df_1 = merged_df[index_1,]
 
 #identify 10-xxx
-
 index_2 = grepl("^[1][0]...", df_1$course)
 
 df_2 = df_1[!index_2,] #get courses that are don't start with 10 but end with 600 or greater
@@ -161,6 +159,42 @@ df_2 = df_1[!index_2,] #get courses that are don't start with 10 but end with 60
 undergrad_df = merged_df[merged_df$course %!in% df_2$course,]
 
 head(undergrad_df, 5)
+```
+
+```{r}
+#Calculate GPA
+#By semester (updating each semester based on previous semester and total QPA)
+#Quality Points = units * grade
+#QPA = sum(QP)/sum(units)
+#(A = 4, B = 3, C = 2, D = 1, R = 0, P/N/O/W doesn't count towards GPA)
+
+#case_when is type-strict meaning you need to return values of same type
+#classify P/N/O/W as 100 and then remove rows where number_grade == 100
+undergrad_df$number_grade = case_when(
+  undergrad_df$grade == "A" ~ 4,
+  undergrad_df$grade == "B" ~ 3,
+  undergrad_df$grade == "C" ~ 2,
+  undergrad_df$grade == "D" ~ 1,
+  undergrad_df$grade == "R" ~ 0,
+  TRUE ~ 100
+  )
+
+basic_grade_df = undergrad_df[undergrad_df$number_grade != 100,]
+
+basic_grade_df$quality_points = basic_grade_df$units*basic_grade_df$number_grade
+
+basic_grade_df
+
+#QPA by semester (how to create an updating QPA that is weighed by previous semesters)
+basic_grade_df %>% 
+  group_by(student, semester) %>%
+  summarise(n_courses = n(),
+            QP_sum = sum(quality_points), 
+            unit_sum = sum(units), 
+            QPA = round(QP_sum/unit_sum,2)
+            )
+
+#Then left_join that dataframe with the main one by student and semester (think primary and foreign key)
 ```
 
 ## EDA
