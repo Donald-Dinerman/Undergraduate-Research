@@ -20,11 +20,13 @@ The Statistics & Data Science Advising team wants to use data to better support 
 #Load libraries
 
 library(dplyr)
+library(tidyr)
+library(zoo)
+library(kableExtra)
 ```
 
 ```{r}
 stat_df = read.csv("stats_data.csv")
-head(stat_df,5)
 ```
 
 Questions:
@@ -46,16 +48,14 @@ Questions:
 ## Prep Data
 
 ```{r}
-#create var designating semester and relative year (e.g., Freshman Fall 2020, Junior Spring 2019)
-#use regex to sparse through first_enrolled and semester
-#not as simple as subtracting (how to id transfers)
+#Inconsistencies between first enrolled and course semester
 
 char_remover = function(x){gsub("[^0-9.-]", "", x) %>% as.numeric()}
 
 sem = char_remover(stat_df$semester) - char_remover(stat_df$first_enrolled)
 
 #instances where first enroll date > semester date (weird, need explanation) (119 students) 
-stat_df[which(sem < 0),] %>% head(5)
+#stat_df[which(sem < 0),] %>% head(5)
 ```
 
 ```{r}
@@ -75,11 +75,10 @@ declared_stat_df = stat_df %>%
   filter(student %!in% h00_students)
 ```
 
-**Check with Pef**
 ```{r}
-#Some students switched majors midway (interesting)
+#Some students switched majors midway
 #using merge, assign students who switched majors midway to the major they have in their last semester
-#eg., STA to ECOSTA is now a ECOSTA for all the semesters (check with pef)
+#eg., STA to ECOSTA is now a ECOSTA for all the semesters
 
 #major in student's last semester
 declared_students = stat_df %>%
@@ -88,63 +87,18 @@ declared_students = stat_df %>%
   summarise_all(last) %>% #takes last semester student is recorded
   filter(major != "H00")
 
-#Merge df (its like left join)
-
+#Join dfs
 drop.cols = c("major.x", "major.y")
 
 merged_df = left_join(declared_stat_df, declared_students, "student") %>% #keeps all x rows, matches y rows by student
   mutate(major = major.y, .before = first_enrolled) %>% #major.y are the fin semester majors
   select(-drop.cols) #removes duplicate major.y and major.x from previous df
-  
-head(merged_df, 5)
-```
-
-
-```{r}
-#EDA on classes are going to have to be based on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
-table(declared_stat_df$course, declared_stat_df$grade) %>% head()
-
-unique(declared_stat_df$course) %>% length() #number of classes
-```
-
-```{r}
-#make proportion table for courses
-#e.g., 0.001 kids take 21-366
-
-n_students = merged_df$student %>% unique() %>% length()
-
-prop_tab = (table(merged_df$course) / n_students) %>% round(4) #round by 4 so that percentage is rounded by 2
-
-percentage_course_df = as.data.frame(prop_tab * 100) %>% arrange(-Freq)
-
-colnames(percentage_course_df) = c("Course", "% of Students")
-
-head(percentage_course_df, 5)
-```
-
-```{r}
-#group prop courses by major
-hold = declared_students %>% #to get students per major
-  group_by(major) %>%
-  summarise(count = n())
-
-test = merged_df %>% #to get students in course by major
-  group_by(major) %>%
-  count(course, name = "n_course")
-
-percentage_course_by_major = left_join(test, hold, "major") %>%
-  mutate(prop = round((n_course/count)*100, 2)) %>%
-  group_by(major) %>%
-  slice_max(n = 3, order_by = prop, with_ties = F) %>%
-  arrange(major, -prop)
-
-head(percentage_course_by_major, 5)
 ```
 
 ```{r}
 #remove grad classes
 #(1) keep 10-xxx, (2) remove xx-600 >
-#######Issue: Master courses and other omitted courses still feed into units carried, GPA
+#######Issue: Master courses and other omitted courses still feed into semester units_carried
 
 #identify xx-600 >
 index_1 = grepl("^..[6-9]", merged_df$course)
@@ -157,8 +111,6 @@ index_2 = grepl("^[1][0]...", df_1$course)
 df_2 = df_1[!index_2,] #get courses that are don't start with 10 but end with 600 or greater
 
 undergrad_df = merged_df[merged_df$course %!in% df_2$course,]
-
-head(undergrad_df, 5)
 ```
 
 ```{r}
@@ -179,14 +131,23 @@ undergrad_df$number_grade = case_when(
   TRUE ~ 100
   )
 
-basic_grade_df = undergrad_df[undergrad_df$number_grade != 100,]
+basic_grade_df = undergrad_df[undergrad_df$number_grade != 100,] #don't calculate QPA for P/N/O/W grades
 
 basic_grade_df$quality_points = basic_grade_df$units*basic_grade_df$number_grade
 
-basic_grade_df
+#QPA by semester
+#Factor semester and create levels to solve ordering issue (e.g., F16 comes before S15)
 
-#QPA by semester (how to create an updating QPA that is weighed by previous semesters)
-basic_grade_df %>% 
+reference_level = c("F14", "S15", "M15", "N15",
+                    "F15", "S16", "M16", "N16",
+                    "F16", "S17", "M17", "N17",
+                    "F17", "S18", "M18", "N18",
+                    "F18", "S19", "M19", "N19",
+                    "F19", "S20")
+
+basic_grade_df$semester = factor(basic_grade_df$semester, levels = reference_level)
+
+non_updating_QPA = basic_grade_df %>% 
   group_by(student, semester) %>%
   summarise(n_courses = n(),
             QP_sum = sum(quality_points), 
@@ -194,11 +155,97 @@ basic_grade_df %>%
             QPA = round(QP_sum/unit_sum,2)
             )
 
-#Then left_join that dataframe with the main one by student and semester (think primary and foreign key)
+#create an updating QPA that is weighed by previous semesters (using cumulative sums)
+updating_QPA = non_updating_QPA %>%
+  group_by(student) %>%
+  summarise(semester, 
+            cumulative_QP = cumsum(QP_sum),
+            cumulative_unit = cumsum(unit_sum),
+            updating_QPA = round(cumulative_QP/cumulative_unit, 2)) %>%
+  select(student, semester, updating_QPA)
+
+#create all combinations with students and semesters
+QPA_students = pull(updating_QPA, 1)
+leveled_semester = factor(reference_level, levels = reference_level)
+
+student_semester_combo_df = crossing(student = QPA_students, semester = leveled_semester)
+
+#left join with updating_QPA
+intermediate_combo_QPA = left_join(student_semester_combo_df, updating_QPA, by = c("student", "semester"))
+
+#Fill NA with previous QPA from student's semester grouped by student
+combo_QPA = intermediate_combo_QPA %>%
+  group_by(student) %>% #information being lost with na.locf (e.g., s0001 is 20 entries instead of 22) --> change na.rm = T to F
+  summarise(semester, QPA = na.locf(updating_QPA, na.rm = F)) #its dropping the NAs after last entry for student i related with student
+
+#left_join filled combo df with the main one by student and semester
+
+joined_updated_QPA_df = left_join(undergrad_df, combo_QPA, by = c("student", "semester"))
+
+#QPA processing created 10 NA records
+#joined_updated_QPA_df[is.na(joined_updated_QPA_df),] %>% nrow() equals 10
+
+#Can backtrack to try to find them (difficult)
+#Or delete these 10 records as they seem obscure (outliers) anyway
+clean_joined_updated_QPA_df = na.omit(joined_updated_QPA_df) #removes 10 rows with NAs
+
+head(clean_joined_updated_QPA_df,3)
 ```
 
 ## EDA
 
+### Tables
+
+General Note: Need to adjust df on EDA to reflect the most up to date wrangled data
+```{r}
+#EDA on classes are going to have to be based on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
+table(clean_joined_updated_QPA_df$course, clean_joined_updated_QPA_df$grade) %>% head()
+
+unique(clean_joined_updated_QPA_df$course) %>% length() #number of classes
+```
+
+```{r}
+#make proportion table for courses
+#e.g., 0.001 kids take 21-366
+
+n_students = clean_joined_updated_QPA_df$student %>% unique() %>% length()
+
+prop_tab = (table(clean_joined_updated_QPA_df$course) / n_students) %>% round(4) #round by 4 so that percentage is rounded by 2
+
+percentage_course_df = as.data.frame(prop_tab * 100) %>% arrange(-Freq)
+
+colnames(percentage_course_df) = c("Course", "% of Students")
+
+head(percentage_course_df, 5)  %>% 
+  kbl(caption = "Table 1: Top 5 Courses Taken", booktabs = T) %>% 
+  kable_paper("hover", full_width = T)
+```
+
+```{r}
+#group prop courses by major
+hold = declared_students %>% #to get students per major
+  group_by(major) %>%
+  summarise(count = n())
+
+test = clean_joined_updated_QPA_df %>% #to get students in course by major
+  group_by(major) %>%
+  count(course, name = "n_course")
+
+percentage_course_by_major = left_join(test, hold, "major") %>%
+  mutate(prop = round((n_course/count)*100, 2)) %>%
+  group_by(major) %>%
+  slice_max(n = 3, order_by = prop, with_ties = F) %>%
+  arrange(major, -prop)
+
+colnames(percentage_course_by_major) = c("Major", "Course", "n_course", "n_major", "% of Students")
+
+percentage_course_by_major[,c(2,5)] %>%
+  kbl(caption = "Table 2: Top 3 courses taken across majors", booktabs = T) %>% 
+  kable_paper("hover", full_width = T) %>%
+    pack_rows(index = c("ECOSTA" = 3, "STA" = 3, "STAMACH" = 3))
+```
+
+### Graphs
 ```{r}
 #popular electives by major
 ```
