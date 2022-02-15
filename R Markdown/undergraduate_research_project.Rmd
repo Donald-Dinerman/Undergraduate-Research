@@ -23,6 +23,7 @@ library(dplyr)
 library(tidyr)
 library(zoo)
 library(kableExtra)
+library(stringr)
 ```
 
 ```{r}
@@ -55,21 +56,88 @@ char_remover = function(x){gsub("[^0-9.-]", "", x) %>% as.numeric()}
 sem = char_remover(stat_df$semester) - char_remover(stat_df$first_enrolled)
 
 #instances where first enroll date > semester date (weird, need explanation) (119 students) 
-#stat_df[which(sem < 0),] %>% head(5)
+#stat_df[which(sem < 0),]
+```
+
+```{r}
+#Fix the discrepancy above
+#If first enrolled > semester, then make first_enrolled = the first semester shown in data for a student (conditional)
+
+discrep_student = stat_df[which(sem < 0),] %>%
+  pull(1)
+
+`%!in%` = Negate(`%in%`) #create %!in% operator
+
+#make semester factor then arrange by semester to take order of first
+
+reference_level = c("F14", "S15", "M15", "N15",
+                    "F15", "S16", "M16", "N16",
+                    "F16", "S17", "M17", "N17",
+                    "F17", "S18", "M18", "N18",
+                    "F18", "S19", "M19", "N19",
+                    "F19", "S20")
+
+stat_df$semester = factor(stat_df$semester, levels = reference_level)
+
+first_sem_discrep = stat_df %>% #first semester for discrepancy students
+  group_by(student) %>% 
+  arrange(semester) %>% #need to arrange by semester to capture true first semester entry
+  summarize_all(first) %>% 
+  select(student, semester) %>%
+  filter(student %in% discrep_student)
+
+first_enroll_non_discrep = stat_df %>% #ppl w/o discrepancy may have first semester earlier than their first class in the df
+  filter(student %!in% discrep_student) %>% 
+  select(student, first_enrolled) %>%
+  unique() %>%
+  rename(semester = first_enrolled)
+
+first_sem = rbind(first_sem_discrep, first_enroll_non_discrep) %>%
+  arrange(student)
+
+discrep_fixed_df = stat_df[,-4] %>% #remove old first_enrolled
+  left_join(., first_sem, "student") %>%
+  rename(semester = semester.x, first_enrolled = semester.y) %>% #rename variables
+  select(student, class_id, major, first_enrolled, everything()) #set order we view variables
+
+discrep_fixed_df
+```
+
+*this needs work*
+```{r}
+#Calculate graduation year
+#Can instead: find first semester entry, to the substr thing w semester but conditional on class_id
+#may have to calculate grad year depending on whether first_enrolled is fall (spring grad, next year) or spring (winter grad same year)
+
+
+#can't calculate grad year like this bc some student's last semester in data is there sophomore and junior year
+#also would need to at least arrange by semester
+grad_year = discrep_fixed_df %>% 
+  group_by(student) %>% 
+  arrange(first_enrolled) %>%
+  summarize_all(last) %>% 
+  mutate(prelim_year = 2000 + as.numeric(substr(first_enrolled,2,3)),
+         graduation_year = prelim_year + class_id) %>% 
+  select(student, graduation_year)
+
+#df = stat_df %>% 
+#  left_join(., grad_year, "student") %>% 
+#  select(-first_enrolled) %>% 
+#  rename(semester = semester.x, first_enrolled = semester.y) %>% 
+#  select(student, class_id, major, first_enrolled, graduation_year, everything())
 ```
 
 ```{r}
 #filter out non-majors (H00: undeclared) if the last semester is H00
 #e.g., if STA last semester, change H00 to STA
 
-h00_students = stat_df %>%
+h00_students = discrep_fixed_df %>%
   group_by(student) %>%
+  arrange(semester) %>% #have to arrange by semester to get true order
   summarise(major) %>%
   summarise_all(last) %>% #takes last semester student is recorded
   filter(major == "H00") %>%
   pull(1)
-
-`%!in%` = Negate(`%in%`) #create %!in% operator
 
 declared_stat_df = stat_df %>%
   filter(student %!in% h00_students)
@@ -81,8 +149,9 @@ declared_stat_df = stat_df %>%
 #eg., STA to ECOSTA is now a ECOSTA for all the semesters
 
 #major in student's last semester
-declared_students = stat_df %>%
+declared_students = discrep_fixed_df %>%
   group_by(student) %>%
+  arrange(semester) %>%
   summarise(major) %>%
   summarise_all(last) %>% #takes last semester student is recorded
   filter(major != "H00")
@@ -136,16 +205,6 @@ basic_grade_df = undergrad_df[undergrad_df$number_grade != 100,] #don't calculat
 basic_grade_df$quality_points = basic_grade_df$units*basic_grade_df$number_grade
 
 #QPA by semester
-#Factor semester and create levels to solve ordering issue (e.g., F16 comes before S15)
-
-reference_level = c("F14", "S15", "M15", "N15",
-                    "F15", "S16", "M16", "N16",
-                    "F16", "S17", "M17", "N17",
-                    "F17", "S18", "M18", "N18",
-                    "F18", "S19", "M19", "N19",
-                    "F19", "S20")
-
-basic_grade_df$semester = factor(basic_grade_df$semester, levels = reference_level)
 
 non_updating_QPA = basic_grade_df %>% 
   group_by(student, semester) %>%
@@ -185,9 +244,11 @@ joined_updated_QPA_df = left_join(undergrad_df, combo_QPA, by = c("student", "se
 #QPA processing created 10 NA records
 #joined_updated_QPA_df[is.na(joined_updated_QPA_df),] %>% nrow() equals 10
 
-#Can backtrack to try to find them (difficult)
+#Can backtrack to try to find them (difficult) --> anti_join to find
 #Or delete these 10 records as they seem obscure (outliers) anyway
 clean_joined_updated_QPA_df = na.omit(joined_updated_QPA_df) #removes 10 rows with NAs
+
+clean_joined_updated_QPA_df$semester = factor(clean_joined_updated_QPA_df$semester, levels = reference_level) #set factor and level
 
 head(clean_joined_updated_QPA_df,3)
 ```
@@ -245,15 +306,66 @@ percentage_course_by_major[,c(2,5)] %>%
     pack_rows(index = c("ECOSTA" = 3, "STA" = 3, "STAMACH" = 3))
 ```
 
-### Graphs
-```{r}
-#popular electives by major
-```
-
 ```{r}
 #proportion retake classes
 #top 10 courses that are retaken
-#how kids do their first time vs their second time
+
+course_counts = clean_joined_updated_QPA_df %>%
+  group_by(student, course) %>%
+  summarise(times_taken = n()) %>%
+  filter(times_taken > 1)
+
+#doesn't take into account if 1 student retook a class more than once
+retake_course_counts = course_counts %>%
+  group_by(course) %>%
+  summarise(n_students_retake = n()) %>%
+  mutate(retake_percentage = round(n_students_retake/n_students,4)*100) %>%
+  arrange(-n_students_retake)
+
+colnames(retake_course_counts) = c("Course", "Students Retaken", "Retake %") 
+
+head(retake_course_counts[,c(1,3)], 5) %>%  
+  kbl(caption = "Table 3: Top 5 courses retaken", booktabs = T) %>% 
+  kable_paper("hover", full_width = T)
+```
+
+### Graphs
+
+```{r}
+#how kids do their first time vs their second time taking a class
+
+simple_filter_retake = clean_joined_updated_QPA_df %>%
+  group_by(student, semester) %>%
+  summarise(course, grade) %>%
+  filter(student %in% course_counts$student, #Filtering by student and course combo from retake df
+         course %in% course_counts$course) #filtering on students and classes, since classes aren't unique gonna get non retakes
+
+complete_retake = left_join(simple_filter_retake, course_counts, by = c("student", "course")) %>% 
+  filter(times_taken > 1) #to get rid of non-retake courses
+
+#some kids took this class more than 2 times, just take the first and last time they took a class to compare performance
+first_take = complete_retake %>%
+  group_by(student, course) %>%
+  slice_max(n = 1, order_by = semester)
+
+last_take = complete_retake %>%
+  group_by(student, course) %>%
+  slice_min(n = 1, order_by = semester)
+
+first_and_last_takes = rbind(first_take, last_take) %>% 
+  arrange(student, course, semester)
+
+first_and_last_takes
+
+#how do we want to quantify P/N/O/W grades?
+#36-300 internship course (can remove), filter out capstone?
+#list of internship/capstone courses,
+#take first/last grade counts grouped by course, then take proportion of counts
+
+```
+
+```{r}
+#popular electives by major
 ```
 
 ```{r}
@@ -263,28 +375,7 @@ percentage_course_by_major[,c(2,5)] %>%
 ```{r}
 #y1 and y2 are classes
 #x is grades
-#facetted by whether they took this pre-req class
+#faceted by whether they took this pre-req class
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
