@@ -56,17 +56,31 @@ char_remover = function(x){gsub("[^0-9.-]", "", x) %>% as.numeric()}
 sem = char_remover(stat_df$semester) - char_remover(stat_df$first_enrolled)
 
 #instances where first enroll date > semester date (weird, need explanation) (119 students) 
-#stat_df[which(sem < 0),]
 ```
 
 ```{r}
-#Fix the discrepancy above
-#If first enrolled > semester, then make first_enrolled = the first semester - (class_id - 1)
-
+#identify students with discrepancy
 discrep_student = stat_df[which(sem < 0),] %>%
   pull(1)
 
 `%!in%` = Negate(`%in%`) #create %!in% operator
+
+#If first enrolled > semester, then make first_enrolled = the first semester - (class_id - 1)
+discrep_fixer = function(semester_vec, class_id_vec){
+  
+  letter_part = substr(semester_vec, 1, 1) #get letter
+  
+  number_part = substr(semester_vec, 2, 3) %>% as.numeric() #get numbers
+
+  add_class_id = number_part - (class_id_vec - 1) #arithmetic function
+  
+  paste(letter_part, add_class_id, sep = "") #concatenate
+}
+```
+
+
+```{r}
+#Fix the discrepancy above
 
 #make semester factor then arrange by semester to take order of first
 
@@ -83,21 +97,25 @@ first_sem_discrep = stat_df %>% #first semester for discrepancy students
   group_by(student) %>% 
   arrange(semester) %>% #need to arrange by semester to capture true first semester entry
   summarize_all(first) %>% 
-  select(student, semester) %>%
+  select(student, semester, class_id) %>%
   filter(student %in% discrep_student)
+
+first_sem_discrep$discrep_var = discrep_fixer(first_sem_discrep$semester, first_sem_discrep$class_id)
+
+first_sem_discrep_fin = first_sem_discrep %>% select(-c("semester", "class_id"))
 
 first_enroll_non_discrep = stat_df %>% #ppl w/o discrepancy may have first semester earlier than their first class in the df
   filter(student %!in% discrep_student) %>% 
   select(student, first_enrolled) %>%
   unique() %>%
-  rename(semester = first_enrolled)
+  rename(discrep_var = first_enrolled)
 
-first_sem = rbind(first_sem_discrep, first_enroll_non_discrep) %>%
+first_sem = rbind(first_sem_discrep_fin, first_enroll_non_discrep) %>%
   arrange(student)
 
 discrep_fixed_df = stat_df[,-4] %>% #remove old first_enrolled
   left_join(., first_sem, "student") %>%
-  rename(semester = semester.x, first_enrolled = semester.y) %>% #rename variables
+  rename(first_enrolled = discrep_var) %>% #rename variables
   select(student, class_id, major, first_enrolled, everything()) #set order we view variables
 
 discrep_fixed_df
@@ -112,13 +130,14 @@ discrep_fixed_df
 
 #can't calculate grad year like this bc some student's last semester in data is there sophomore and junior year
 #also would need to at least arrange by semester
-grad_year = discrep_fixed_df %>% 
-  group_by(student) %>% 
-  arrange(first_enrolled) %>%
-  summarize_all(last) %>% 
-  mutate(prelim_year = 2000 + as.numeric(substr(first_enrolled,2,3)),
-         graduation_year = prelim_year + class_id) %>% 
-  select(student, graduation_year)
+
+#grad_year = discrep_fixed_df %>% 
+#  group_by(student) %>% 
+#  arrange(first_enrolled) %>%
+#  summarize_all(last) %>% 
+#  mutate(prelim_year = 2000 + as.numeric(substr(first_enrolled,2,3)),
+#         graduation_year = prelim_year + class_id) %>% 
+# select(student, graduation_year)
 
 #df = stat_df %>% 
 #  left_join(., grad_year, "student") %>% 
@@ -130,45 +149,27 @@ grad_year = discrep_fixed_df %>%
 ```{r}
 #Prior major information (get from Alan rmd)
 
-major.changes.df <- df %>% group_by(student) %>% 
-  mutate(major_after = lead(major_)) %>% 
-  filter(major_ != major_after) %>% 
-  ungroup()
+# major.changes.df <- df %>% group_by(student) %>% 
+  # mutate(major_after = lead(major_)) %>% 
+  # filter(major_ != major_after) %>% 
+  # ungroup()
 
-major.changes.df %>% 
-  select(major_, major_after, everything())
+# major.changes.df %>% 
+  # select(major_, major_after, everything())
 
-major.changes <- major.changes.df %>% 
-  select(major_, major_after)
+# major.changes <- major.changes.df %>% 
+  # select(major_, major_after)
 
-major.changes.counts <- major.changes %>%
-  count(., major_, major_after) %>% 
-  filter(major_ != "H00" & major_after != "H00") %>% 
-  arrange(desc(n))
-
-before <- with(major.changes.counts, rep(x = major_, times = n))
-
-after <- with(major.changes.counts, rep(x = major_after, times = n))
-
-df2 <- data.frame(before, after)
-```
-
-
-
-```{r}
-#filter out non-majors (H00: undeclared) if the last semester is H00
-#e.g., if STA last semester, change H00 to STA
-
-h00_students = discrep_fixed_df %>%
-  group_by(student) %>%
-  arrange(semester) %>% #have to arrange by semester to get true order
-  summarise(major) %>%
-  summarise_all(last) %>% #takes last semester student is recorded
-  filter(major == "H00") %>%
-  pull(1)
-
-declared_stat_df = stat_df %>%
-  filter(student %!in% h00_students)
+# major.changes.counts <- major.changes %>%
+#  count(., major_, major_after) %>% 
+#   filter(major_ != "H00" & major_after != "H00") %>% 
+#   arrange(desc(n))
+# 
+# before <- with(major.changes.counts, rep(x = major_, times = n))
+# 
+# after <- with(major.changes.counts, rep(x = major_after, times = n))
+# 
+# df2 <- data.frame(before, after)
 ```
 
 ```{r}
@@ -182,7 +183,7 @@ declared_students = discrep_fixed_df %>%
   arrange(semester) %>%
   summarise(major) %>%
   summarise_all(last) %>% #takes last semester student is recorded
-  filter(major != "H00")
+  filter(major != "H00") #filter out non-majors (H00: undeclared) if the last semester is H00
 
 #Join dfs
 drop.cols = c("major.x", "major.y")
@@ -326,9 +327,9 @@ percentage_course_by_major = left_join(test, hold, "major") %>%
   slice_max(n = 3, order_by = prop, with_ties = F) %>%
   arrange(major, -prop)
 
-colnames(percentage_course_by_major) = c("Major", "Course", "n_course", "n_major", "% of Students")
+colnames(percentage_course_by_major) = c("Major", "Course", "Students Taken", "Students in Major", "% of Students")
 
-percentage_course_by_major[,c(2,5)] %>%
+percentage_course_by_major[,c(2,3,5)] %>%
   kbl(caption = "Table 2: Top 3 courses taken across majors", booktabs = T) %>% 
   kable_paper("hover", full_width = T) %>%
     pack_rows(index = c("ECOSTA" = 3, "STA" = 3, "STAMACH" = 3))
@@ -352,7 +353,7 @@ retake_course_counts = course_counts %>%
 
 colnames(retake_course_counts) = c("Course", "Students Retaken", "Retake %") 
 
-head(retake_course_counts[,c(1,3)], 5) %>%  
+head(retake_course_counts, 5) %>%  
   kbl(caption = "Table 3: Top 5 courses retaken", booktabs = T) %>% 
   kable_paper("hover", full_width = T)
 ```
@@ -404,13 +405,5 @@ first_and_last_takes
 #y1 and y2 are classes
 #x is grades
 #faceted by whether they took this pre-req class
-```
-
-```{r}
-undergrad_df %>%
-   group_by(student) %>%
-   arrange(semester) %>%
-   summarise_all(last) %>%
-   arrange(first_enrolled)
 ```
 
