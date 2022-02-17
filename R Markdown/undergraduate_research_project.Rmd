@@ -61,7 +61,7 @@ sem = char_remover(stat_df$semester) - char_remover(stat_df$first_enrolled)
 
 ```{r}
 #Fix the discrepancy above
-#If first enrolled > semester, then make first_enrolled = the first semester shown in data for a student (conditional)
+#If first enrolled > semester, then make first_enrolled = the first semester - (class_id - 1)
 
 discrep_student = stat_df[which(sem < 0),] %>%
   pull(1)
@@ -126,6 +126,34 @@ grad_year = discrep_fixed_df %>%
 #  rename(semester = semester.x, first_enrolled = semester.y) %>% 
 #  select(student, class_id, major, first_enrolled, graduation_year, everything())
 ```
+
+```{r}
+#Prior major information (get from Alan rmd)
+
+major.changes.df <- df %>% group_by(student) %>% 
+  mutate(major_after = lead(major_)) %>% 
+  filter(major_ != major_after) %>% 
+  ungroup()
+
+major.changes.df %>% 
+  select(major_, major_after, everything())
+
+major.changes <- major.changes.df %>% 
+  select(major_, major_after)
+
+major.changes.counts <- major.changes %>%
+  count(., major_, major_after) %>% 
+  filter(major_ != "H00" & major_after != "H00") %>% 
+  arrange(desc(n))
+
+before <- with(major.changes.counts, rep(x = major_, times = n))
+
+after <- with(major.changes.counts, rep(x = major_after, times = n))
+
+df2 <- data.frame(before, after)
+```
+
+
 
 ```{r}
 #filter out non-majors (H00: undeclared) if the last semester is H00
@@ -378,4 +406,11 @@ first_and_last_takes
 #faceted by whether they took this pre-req class
 ```
 
+```{r}
+undergrad_df %>%
+   group_by(student) %>%
+   arrange(semester) %>%
+   summarise_all(last) %>%
+   arrange(first_enrolled)
+```
 
