@@ -66,6 +66,7 @@ discrep_student = stat_df[which(sem < 0),] %>%
 `%!in%` = Negate(`%in%`) #create %!in% operator
 
 #If first enrolled > semester, then make first_enrolled = the first semester - (class_id - 1)
+#this is an approximation since we can't gather semester based information on first_enrolled (whether they enrolled in F,S,M,N)
 discrep_fixer = function(semester_vec, class_id_vec){
   
   letter_part = substr(semester_vec, 1, 1) #get letter
@@ -84,7 +85,9 @@ discrep_fixer = function(semester_vec, class_id_vec){
 
 #make semester factor then arrange by semester to take order of first
 
-reference_level = c("F14", "S15", "M15", "N15",
+reference_level = c("F12", #add these two semesters based on discrep_fixer approximation for first_semester
+                    "F13", 
+                    "F14", "S15", "M15", "N15",
                     "F15", "S16", "M16", "N16",
                     "F16", "S17", "M17", "N17",
                     "F17", "S18", "M18", "N18",
@@ -92,6 +95,8 @@ reference_level = c("F14", "S15", "M15", "N15",
                     "F19", "S20")
 
 stat_df$semester = factor(stat_df$semester, levels = reference_level)
+
+stat_df$first_enrolled = factor(stat_df$first_enrolled, levels = reference_level)
 
 first_sem_discrep = stat_df %>% #first semester for discrepancy students
   group_by(student) %>% 
@@ -113,12 +118,14 @@ first_enroll_non_discrep = stat_df %>% #ppl w/o discrepancy may have first semes
 first_sem = rbind(first_sem_discrep_fin, first_enroll_non_discrep) %>%
   arrange(student)
 
+first_sem$discrep_var = factor(first_sem$discrep_var, levels = reference_level)
+
 discrep_fixed_df = stat_df[,-4] %>% #remove old first_enrolled
   left_join(., first_sem, "student") %>%
   rename(first_enrolled = discrep_var) %>% #rename variables
   select(student, class_id, major, first_enrolled, everything()) #set order we view variables
 
-discrep_fixed_df
+head(discrep_fixed_df,3)
 ```
 
 *this needs work*
@@ -188,9 +195,13 @@ declared_students = discrep_fixed_df %>%
 #Join dfs
 drop.cols = c("major.x", "major.y")
 
-merged_df = left_join(declared_stat_df, declared_students, "student") %>% #keeps all x rows, matches y rows by student
+#make sure left df is most up to date one
+
+merged_df = left_join(discrep_fixed_df, declared_students, "student") %>% #keeps all x rows, matches y rows by student
   mutate(major = major.y, .before = first_enrolled) %>% #major.y are the fin semester majors
   select(-drop.cols) #removes duplicate major.y and major.x from previous df
+
+remove_non_majors = na.omit(merged_df) #NA's are H00 majors so we remove them
 ```
 
 ```{r}
@@ -199,16 +210,16 @@ merged_df = left_join(declared_stat_df, declared_students, "student") %>% #keeps
 #######Issue: Master courses and other omitted courses still feed into semester units_carried
 
 #identify xx-600 >
-index_1 = grepl("^..[6-9]", merged_df$course)
+index_1 = grepl("^..[6-9]", remove_non_majors$course)
 
-df_1 = merged_df[index_1,]
+df_1 = remove_non_majors[index_1,]
 
 #identify 10-xxx
 index_2 = grepl("^[1][0]...", df_1$course)
 
 df_2 = df_1[!index_2,] #get courses that are don't start with 10 but end with 600 or greater
 
-undergrad_df = merged_df[merged_df$course %!in% df_2$course,]
+undergrad_df = remove_non_majors[remove_non_majors$course %!in% df_2$course,]
 ```
 
 ```{r}
@@ -270,11 +281,9 @@ combo_QPA = intermediate_combo_QPA %>%
 
 joined_updated_QPA_df = left_join(undergrad_df, combo_QPA, by = c("student", "semester"))
 
-#QPA processing created 10 NA records
-#joined_updated_QPA_df[is.na(joined_updated_QPA_df),] %>% nrow() equals 10
+# joined_updated_QPA_df[is.na(joined_updated_QPA_df),] %>% nrow() = 10
 
-#Can backtrack to try to find them (difficult) --> anti_join to find
-#Or delete these 10 records as they seem obscure (outliers) anyway
+# Check the QPA NA
 clean_joined_updated_QPA_df = na.omit(joined_updated_QPA_df) #removes 10 rows with NAs
 
 clean_joined_updated_QPA_df$semester = factor(clean_joined_updated_QPA_df$semester, levels = reference_level) #set factor and level
