@@ -154,32 +154,6 @@ head(discrep_fixed_df,3)
 ```
 
 ```{r}
-#Prior major information (get from Alan rmd)
-
-# major.changes.df <- df %>% group_by(student) %>% 
-  # mutate(major_after = lead(major_)) %>% 
-  # filter(major_ != major_after) %>% 
-  # ungroup()
-
-# major.changes.df %>% 
-  # select(major_, major_after, everything())
-
-# major.changes <- major.changes.df %>% 
-  # select(major_, major_after)
-
-# major.changes.counts <- major.changes %>%
-#  count(., major_, major_after) %>% 
-#   filter(major_ != "H00" & major_after != "H00") %>% 
-#   arrange(desc(n))
-# 
-# before <- with(major.changes.counts, rep(x = major_, times = n))
-# 
-# after <- with(major.changes.counts, rep(x = major_after, times = n))
-# 
-# df2 <- data.frame(before, after)
-```
-
-```{r}
 #Some students switched majors midway
 #using merge, assign students who switched majors midway to the major they have in their last semester
 #eg., STA to ECOSTA is now a ECOSTA for all the semesters
@@ -193,15 +167,40 @@ declared_students = discrep_fixed_df %>%
   filter(major != "H00") #filter out non-majors (H00: undeclared) if the last semester is H00
 
 #Join dfs
-drop.cols = c("major.x", "major.y")
+drop.cols = c("major.y")
 
 #make sure left df is most up to date one
 
 merged_df = left_join(discrep_fixed_df, declared_students, "student") %>% #keeps all x rows, matches y rows by student
   mutate(major = major.y, .before = first_enrolled) %>% #major.y are the fin semester majors
-  select(-drop.cols) #removes duplicate major.y and major.x from previous df
+  select(-drop.cols) #removes duplicate major.y from previous df
 
-remove_non_majors = na.omit(merged_df) #NA's are H00 majors so we remove them
+remove_non_majors = na.omit(merged_df) %>% #NA's are H00 majors so we remove them
+  arrange(student, semester) 
+```
+
+```{r}
+#Major change information (primarily for EDA insight and not modelling)
+
+major_changes_df = remove_non_majors %>% 
+   group_by(student) %>% 
+   mutate(major_after = lead(major.x)) %>% #Alan explain lead() function and purpose of filtering
+   filter(major.x != major_after) %>% 
+   ungroup()
+
+major_changes = major_changes_df %>% 
+  select(major.x, major_after)
+
+major_changes_counts = major_changes %>%
+  count(., major.x, major_after) %>% 
+   filter(major.x != "H00" & major_after != "H00") %>% 
+   arrange(desc(n))
+ 
+before = with(major_changes_counts, rep(x = major.x, times = n))
+
+after = with(major_changes_counts, rep(x = major_after, times = n))
+
+major_change_eda_df = data.frame(before, after)
 ```
 
 ```{r}
@@ -296,12 +295,6 @@ head(clean_joined_updated_QPA_df,3)
 ### Tables
 
 General Note: Need to adjust df on EDA to reflect the most up to date wrangled data
-```{r}
-#EDA on classes are going to have to be based on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
-table(clean_joined_updated_QPA_df$course, clean_joined_updated_QPA_df$grade) %>% head()
-
-unique(clean_joined_updated_QPA_df$course) %>% length() #number of classes
-```
 
 ```{r}
 #make proportion table for courses
@@ -370,6 +363,49 @@ head(retake_course_counts, 5) %>%
 ### Graphs
 
 ```{r}
+#Grade distribution function by course
+
+class_grade = table(clean_joined_updated_QPA_df$course, clean_joined_updated_QPA_df$grade) %>% 
+  as.data.frame() %>%
+  pivot_wider(names_from = Var2, values_from = Freq) %>%
+  mutate(n_students = rowSums(.[2:10])) %>%
+  rename(Course = Var1)
+
+prop_class_grade = class_grade %>%
+  mutate(across(c(2:10), .fns = ~./(n_students/100)) %>% #n_students/100 puts value in percentage terms
+           round(2)) %>%
+  #filter(n_students >= 20) %>%
+  arrange(-n_students)
+
+course_grade_func = function(class){
+
+  class = as.character(class) #accept numeric and character classes
+  
+  drop = c("Course", "n_students")
+
+  course_df = prop_class_grade %>% 
+    filter(Course == class) %>% 
+    select(-drop) %>%
+    pivot_longer(everything())
+             
+  ggplot(course_df, aes(x = name, y = value)) +
+    geom_col(col = "black", fill = "steelblue") +
+    geom_text(aes(label = value), position = position_dodge (width = 0.9), vjust = -0.25) + #adds text labels
+    labs(title = paste("Grade Distribution for",class), x = "Grades", y = "Grade Distribution (%)")
+
+}
+
+#for loop graph output
+top_n_classes = prop_class_grade[,1] %>% pull(1)
+
+for(i in 1:5) {
+  course_grade_func(top_n_10_classes[i]) %>% print()
+}
+
+#course_grade_func(36226) #basic use
+```
+
+```{r}
 #how kids do their first time vs their second time taking a class
 
 simple_filter_retake = clean_joined_updated_QPA_df %>%
@@ -414,5 +450,10 @@ first_and_last_takes
 #y1 and y2 are classes
 #x is grades
 #faceted by whether they took this pre-req class
+```
+
+```{r}
+#Based class EDA on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
+
 ```
 
