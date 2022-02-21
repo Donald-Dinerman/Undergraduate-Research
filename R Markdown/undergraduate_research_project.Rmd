@@ -24,6 +24,7 @@ library(tidyr)
 library(zoo)
 library(kableExtra)
 library(stringr)
+library(ggplot2)
 ```
 
 ```{r}
@@ -125,7 +126,7 @@ discrep_fixed_df = stat_df[,-4] %>% #remove old first_enrolled
   rename(first_enrolled = discrep_var) %>% #rename variables
   select(student, class_id, major, first_enrolled, everything()) #set order we view variables
 
-head(discrep_fixed_df,3)
+#head(discrep_fixed_df,3)
 ```
 
 *this needs work*
@@ -287,7 +288,12 @@ clean_joined_updated_QPA_df = na.omit(joined_updated_QPA_df) #removes 10 rows wi
 
 clean_joined_updated_QPA_df$semester = factor(clean_joined_updated_QPA_df$semester, levels = reference_level) #set factor and level
 
-head(clean_joined_updated_QPA_df,3)
+#head(clean_joined_updated_QPA_df,3)
+```
+
+```{r}
+#export cleaned data
+wrangled_data = write.csv(clean_joined_updated_QPA_df)
 ```
 
 ## EDA
@@ -399,10 +405,10 @@ course_grade_func = function(class){
 top_n_classes = prop_class_grade[,1] %>% pull(1)
 
 for(i in 1:5) {
-  course_grade_func(top_n_10_classes[i]) %>% print()
+  course_grade_func(top_n_classes[i]) %>% print()
 }
 
-#course_grade_func(36226) #basic use
+course_grade_func(36402) #basic use
 ```
 
 ```{r}
@@ -429,7 +435,7 @@ last_take = complete_retake %>%
 first_and_last_takes = rbind(first_take, last_take) %>% 
   arrange(student, course, semester)
 
-first_and_last_takes
+head(first_and_last_takes)
 
 #how do we want to quantify P/N/O/W grades?
 #36-300 internship course (can remove), filter out capstone?
