@@ -83,7 +83,6 @@ discrep_fixer = function(semester_vec, class_id_vec){
 
 ```{r}
 #Fix the discrepancy above
-
 #make semester factor then arrange by semester to take order of first
 
 reference_level = c("F12", #add these two semesters based on discrep_fixer approximation for first_semester
@@ -125,11 +124,9 @@ discrep_fixed_df = stat_df[,-4] %>% #remove old first_enrolled
   left_join(., first_sem, "student") %>%
   rename(first_enrolled = discrep_var) %>% #rename variables
   select(student, class_id, major, first_enrolled, everything()) #set order we view variables
-
-#head(discrep_fixed_df,3)
 ```
 
-*this needs work*
+*this needs work*(may not need grad year data)
 ```{r}
 #Calculate graduation year
 #Can instead: find first semester entry, to the substr thing w semester but conditional on class_id
@@ -293,7 +290,15 @@ clean_joined_updated_QPA_df$semester = factor(clean_joined_updated_QPA_df$semest
 
 ```{r}
 #export cleaned data
-wrangled_data = write.csv(clean_joined_updated_QPA_df)
+write.csv(clean_joined_updated_QPA_df, file = "wrangled_data.csv")
+```
+
+```{r}
+#Elective/Core Wrangling
+```
+
+```{r}
+#AP/Transfer Credit Wrangling
 ```
 
 ## EDA
@@ -342,6 +347,16 @@ percentage_course_by_major[,c(2,3,5)] %>%
   kable_paper("hover", full_width = T) %>%
     pack_rows(index = c("ECOSTA" = 3, "STA" = 3, "STAMACH" = 3))
 ```
+```{r}
+#Prove that the data includes students who didn't fully matriculate (less than senior)
+
+proof_df = clean_joined_updated_QPA_df %>%
+  group_by(student) %>%
+  arrange(semester) %>%
+  summarise_all(last)
+
+table(proof_df$class_id)
+```
 
 ```{r}
 #proportion retake classes
@@ -383,37 +398,48 @@ prop_class_grade = class_grade %>%
   #filter(n_students >= 20) %>%
   arrange(-n_students)
 
-course_grade_func = function(class){
+course_grade_func = function(class, label = F){
 
   class = as.character(class) #accept numeric and character classes
   
   drop = c("Course", "n_students")
 
   course_df = prop_class_grade %>% 
-    filter(Course == class) %>% 
+    filter(Course == class)
+
+#student count
+  n_student = course_df$n_students
+  
+  course_df_fin = course_df %>%
     select(-drop) %>%
     pivot_longer(everything())
              
-  ggplot(course_df, aes(x = name, y = value)) +
+  p = ggplot(course_df_fin, aes(x = name, y = value)) +
     geom_col(col = "black", fill = "steelblue") +
-    geom_text(aes(label = value), position = position_dodge (width = 0.9), vjust = -0.25) + #adds text labels
-    labs(title = paste("Grade Distribution for",class), x = "Grades", y = "Grade Distribution (%)")
+    labs(title = paste("Grade Distribution for",class), x = "Grades", y = "Grade Distribution (%)",
+         subtitle = paste("Number of Students:",n_student))
 
+  if(label == T){
+    
+    p = p + geom_text(aes(label = value), position = position_dodge (width = 0.9), vjust = -0.25) #adds text labels
+
+  }
+  
+  print(p)
 }
 
 #for loop graph output
 top_n_classes = prop_class_grade[,1] %>% pull(1)
 
 for(i in 1:5) {
-  course_grade_func(top_n_classes[i]) %>% print()
+  course_grade_func(top_n_classes[i], label = F)
 }
 
-course_grade_func(36402) #basic use
+#course_grade_func(36402, label = F) #basic use
 ```
 
 ```{r}
 #how kids do their first time vs their second time taking a class
-
 simple_filter_retake = clean_joined_updated_QPA_df %>%
   group_by(student, semester) %>%
   summarise(course, grade) %>%
@@ -432,16 +458,87 @@ last_take = complete_retake %>%
   group_by(student, course) %>%
   slice_min(n = 1, order_by = semester)
 
+#filter out capstone courses
+#list of internship/capstone courses
+capstone_courses = first_and_last_takes %>% filter(grade %in% c("P", "A")) %>%
+  group_by(student, course) %>%
+  summarise(count = n()) %>%
+  filter(count == 2) %>%
+  pull(2) %>%
+  unique()
+
 first_and_last_takes = rbind(first_take, last_take) %>% 
-  arrange(student, course, semester)
+  arrange(student, course, semester) %>%
+  filter(course %!in% capstone_courses) #filter out these course types
+```
 
-head(first_and_last_takes)
 
-#how do we want to quantify P/N/O/W grades?
-#36-300 internship course (can remove), filter out capstone?
-#list of internship/capstone courses,
-#take first/last grade counts grouped by course, then take proportion of counts
+```{r}
+#Make graph above for top 3 retake classes, colored by first/last time, x grade, y prop
 
+#Function to prep data
+format_grade_prop = function(order, char_order){
+  
+  first_time = first_and_last_takes %>%
+    group_by(student, course) %>%
+    summarise_all(order)
+
+  first_time_grade = table(first_time$course, first_time$grade) %>%
+    as.data.frame() %>%
+    pivot_wider(names_from = Var2, values_from = Freq) %>%
+    mutate(n_students = rowSums(.[2:7])) %>%
+    rename(course = Var1)
+
+  first_time_grade %>%
+    mutate(across(c(2:7), .fns = ~./(n_students/100)) %>% #n_students/100 puts value in percentage terms
+             round(2)) %>%
+    arrange(-n_students) %>%
+    mutate(timing = char_order)
+}
+
+#Repeat prep for first and last times taking the course
+first_leg = format_grade_prop(first, "First") %>% mutate(A = 0, B = 0, .before = C)
+
+last_leg = format_grade_prop(last, "Last") %>% mutate(N = 0, .before = P)
+
+#Function to combine legs, create class specification, and graph
+retake_course_grade_func =  function(class, label = F){
+
+  class = as.numeric(class) #so it can take in char/numeric types
+  
+  drop_columns = c("course", "n_students")
+  
+  first_last_course_df = rbind(first_leg, last_leg) %>%
+    filter(course == class)
+  
+  n_student = first_last_course_df$n_students[2]
+  
+  first_last_course_df_fin = first_last_course_df %>%
+      select(-drop_columns) %>%
+    pivot_longer(!timing, names_to = "grade", values_to = "prop")
+
+  p = ggplot(first_last_course_df_fin, aes(x = grade, y = prop, fill = timing)) +
+      geom_col(position = "dodge", col = "black") +
+      labs(title = paste("Retake Grade Distribution for", class), x = "Grades", y = "Grade Distribution (%)", fill = "Timing",
+         subtitle = paste("Number of Students:", n_student))
+
+  if(label ==T){ #labeling flexibility (turn on and off)
+    
+    p = p + geom_text(aes(label = prop), position = position_dodge (width = 0.9), vjust = -0.25) #adds text labels
+
+  }
+    
+  print(p)
+}
+
+#for loop graph output
+top_n_classes = retake_course_counts[,1] %>% pull(1)
+
+for(i in 1:3) {
+  retake_course_grade_func(top_n_classes[i], label = F)
+}
+
+#retake_course_grade_func(15122, label = F) #basic use
 ```
 
 ```{r}
