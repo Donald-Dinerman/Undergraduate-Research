@@ -18,7 +18,7 @@ The Statistics & Data Science Advising team wants to use data to better support 
 
 ```{r, include=F}
 #Load libraries
-
+library(readxl)
 library(dplyr)
 library(tidyr)
 library(zoo)
@@ -28,7 +28,20 @@ library(ggplot2)
 ```
 
 ```{r}
+#main data set
 stat_df = read.csv("stats_data.csv")
+```
+
+```{r}
+#elective/core course information
+stat_core_df = read_xlsx("core_elective_data.xlsx", sheet = 1)[-1,-1] #remove second row and first column from excel file
+stat_elective_df = read_xlsx("core_elective_data.xlsx", sheet = 2)[-1,-1]
+
+econ_stat_core_df = read_xlsx("core_elective_data.xlsx", sheet = 3)[-1,-1]
+econ_stat_elective_df = read_xlsx("core_elective_data.xlsx", sheet = 4)[-1,-1]
+
+stat_ml_core_df = read_xlsx("core_elective_data.xlsx", sheet = 5)[-1,-1]
+stat_ml_elective_df = read_xlsx("core_elective_data.xlsx", sheet = 6)[-1,-1]
 ```
 
 Questions:
@@ -50,6 +63,105 @@ Questions:
 ## Prep Data
 
 ```{r}
+#Create function to clean x's
+clean_x = function(vec){
+
+  number_of_x_string = grepl("x", vec) %>% sum() #check if vector contains strings w x
+  
+  if(number_of_x_string == 0){vec} #need this to add flexibility to function for vectors without x
+    else{
+      
+      #1) identifies character string containing x
+      location = grep("x", vec)
+
+      x_vec = vec[location]
+
+      #2) replace the x to 0 and 9, convert to numeric
+
+      replace_0 = gsub("x", "0", x_vec) %>% as.numeric()
+      replace_9 = gsub("x", "9", x_vec) %>% as.numeric()
+
+      #3) take the range of the replacements indexed by length of x vec (e.g., 12300:12399, 12840:12849)
+
+      hold = NULL
+
+      for(i in 1:length(x_vec)){
+  
+        temp = replace_0[i]:replace_9[i]
+        hold = c(hold, temp)
+      }
+
+      x_fully_converted = hold
+  
+      #4) add x_fully_converted to original vector
+  
+      x_combined = c(vec, x_fully_converted)
+  
+      #5)remove strings that can't be converted to as.numeric
+      char_string_removed = grep("[a-z]", x_combined, invert = TRUE, value = TRUE)
+      char_string_removed
+    }
+      
+}
+```
+
+```{r}
+`%!in%` = Negate(`%in%`) #create %!in% operator
+
+#Classify core/elective courses across majors
+
+get_unique_classes = function(df){
+  
+  cleaned_vec = df %>% as.matrix() %>% as.vector() %>% na.omit() %>% clean_x() %>% unique() %>% as.numeric()
+  
+  cleaned_vec
+}
+
+#stat
+stat_core = get_unique_classes(stat_core_df)
+
+stat_elective = get_unique_classes(stat_elective_df) 
+
+#Econ/Stat
+econ_stat_core = get_unique_classes(econ_stat_core_df)
+
+econ_stat_elective_remove = c(73374, 73363, 73407, 73450) #cannot include vec
+econ_stat_elective_pre_removal = get_unique_classes(econ_stat_elective_df) 
+econ_stat_elective = econ_stat_elective_pre_removal[econ_stat_elective_pre_removal %!in% econ_stat_elective_remove]
+
+#Stat/ML
+stat_ml_core = get_unique_classes(stat_ml_core_df)
+
+stat_ml_elective_remove = c(36410) #cannot include vec
+stat_ml_elective_pre_removal = get_unique_classes(stat_ml_elective_df)
+stat_ml_elective = stat_ml_elective_pre_removal[stat_ml_elective_pre_removal %!in% stat_ml_elective_remove]
+```
+
+*Note: The data Amanda gave us classifies any 363xx class as a core even though a course like 36-315 is a pure elective*
+```{r}
+#Assign course classification columns in main df
+
+stat_df$stat_core = (stat_df$course %in% stat_core) %>% as.numeric()
+stat_df$stat_elective = (stat_df$course %in% stat_elective) %>% as.numeric()
+
+stat_df$econ_stat_core = (stat_df$course %in% econ_stat_core) %>% as.numeric()
+stat_df$econ_stat_elective = (stat_df$course %in% econ_stat_elective) %>% as.numeric()
+
+stat_df$stat_ml_core = (stat_df$course %in% stat_ml_core) %>% as.numeric()
+stat_df$stat_ml_elective = (stat_df$course %in% stat_ml_elective) %>% as.numeric()
+```
+
+```{r}
+#Find times where course is a core and elective
+#Small example, these courses are classified as both core and elective based on the excel file, how should we fix?
+stat_df %>% 
+  filter(stat_core == 1, stat_elective == 1) %>%
+  select(course) %>%
+  unique()
+```
+
+
+```{r}
 #Inconsistencies between first enrolled and course semester
 
 char_remover = function(x){gsub("[^0-9.-]", "", x) %>% as.numeric()}
@@ -64,8 +176,6 @@ sem = char_remover(stat_df$semester) - char_remover(stat_df$first_enrolled)
 discrep_student = stat_df[which(sem < 0),] %>%
   pull(1)
 
-`%!in%` = Negate(`%in%`) #create %!in% operator
-
 #If first enrolled > semester, then make first_enrolled = the first semester - (class_id - 1)
 #this is an approximation since we can't gather semester based information on first_enrolled (whether they enrolled in F,S,M,N)
 discrep_fixer = function(semester_vec, class_id_vec){
@@ -79,7 +189,6 @@ discrep_fixer = function(semester_vec, class_id_vec){
   paste(letter_part, add_class_id, sep = "") #concatenate
 }
 ```
-
 
 ```{r}
 #Fix the discrepancy above
@@ -294,10 +403,6 @@ write.csv(clean_joined_updated_QPA_df, file = "wrangled_data.csv")
 ```
 
 ```{r}
-#Elective/Core Wrangling
-```
-
-```{r}
 #AP/Transfer Credit Wrangling
 ```
 
@@ -385,6 +490,7 @@ head(retake_course_counts, 5) %>%
 
 ```{r}
 #Grade distribution function by course
+#Grouping by class_id isn't informative due to sample size issues
 
 class_grade = table(clean_joined_updated_QPA_df$course, clean_joined_updated_QPA_df$grade) %>% 
   as.data.frame() %>%
@@ -432,7 +538,7 @@ course_grade_func = function(class, label = F){
 top_n_classes = prop_class_grade[,1] %>% pull(1)
 
 for(i in 1:5) {
-  course_grade_func(top_n_classes[i], label = F)
+  course_grade_func(top_n_classes[i], label = T)
 }
 
 #course_grade_func(36402, label = F) #basic use
@@ -458,9 +564,12 @@ last_take = complete_retake %>%
   group_by(student, course) %>%
   slice_min(n = 1, order_by = semester)
 
+first_and_last_takes_basic = rbind(first_take, last_take)
+
 #filter out capstone courses
 #list of internship/capstone courses
-capstone_courses = first_and_last_takes %>% filter(grade %in% c("P", "A")) %>%
+capstone_courses = first_and_last_takes_basic %>% 
+  filter(grade %in% c("P", "A")) %>%
   group_by(student, course) %>%
   summarise(count = n()) %>%
   filter(count == 2) %>%
@@ -471,7 +580,6 @@ first_and_last_takes = rbind(first_take, last_take) %>%
   arrange(student, course, semester) %>%
   filter(course %!in% capstone_courses) #filter out these course types
 ```
-
 
 ```{r}
 #Make graph above for top 3 retake classes, colored by first/last time, x grade, y prop
@@ -535,7 +643,7 @@ retake_course_grade_func =  function(class, label = F){
 top_n_classes = retake_course_counts[,1] %>% pull(1)
 
 for(i in 1:3) {
-  retake_course_grade_func(top_n_classes[i], label = F)
+  retake_course_grade_func(top_n_classes[i], label = T)
 }
 
 #retake_course_grade_func(15122, label = F) #basic use
