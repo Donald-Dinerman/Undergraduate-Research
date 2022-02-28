@@ -97,7 +97,7 @@ clean_x = function(vec){
   
       x_combined = c(vec, x_fully_converted)
   
-      #5)remove strings that can't be converted to as.numeric
+      #5)remove strings that can't be converted to as.numeric/that contain characters
       char_string_removed = grep("[a-z]", x_combined, invert = TRUE, value = TRUE)
       char_string_removed
     }
@@ -138,6 +138,7 @@ stat_ml_elective = stat_ml_elective_pre_removal[stat_ml_elective_pre_removal %!i
 ```
 
 *Note: The data Amanda gave us classifies any 363xx class as a core even though a course like 36-315 is a pure elective*
+*Do we need to make a solid list of core (without the x's) and then %!in% it to the elective vec with the x's to avoid double counting (as core/elective)*
 ```{r}
 #Assign course classification columns in main df
 
@@ -650,11 +651,11 @@ for(i in 1:3) {
 ```
 
 ```{r}
-#popular electives by major
+#popular electives by major (linpeng)
 ```
 
 ```{r}
-#contingency tables on performance with class x and class y
+#contingency tables on performance with class x and class y (Emily)
 ```
 
 ```{r}
@@ -664,7 +665,7 @@ for(i in 1:3) {
 ```
 
 ```{r}
-#Based class EDA on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
+#Base class EDA on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
 
 ```
 
