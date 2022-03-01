@@ -399,12 +399,16 @@ clean_joined_updated_QPA_df$semester = factor(clean_joined_updated_QPA_df$semest
 ```
 
 ```{r}
-#export cleaned data
-write.csv(clean_joined_updated_QPA_df, file = "wrangled_data.csv")
+#AP/Transfer Credit Wrangling
 ```
 
 ```{r}
-#AP/Transfer Credit Wrangling
+#pre-req wrangling
+```
+
+```{r}
+#export cleaned data
+#write.csv(clean_joined_updated_QPA_df, file = "wrangled_data.csv")
 ```
 
 ## EDA
@@ -668,4 +672,32 @@ for(i in 1:3) {
 #Base class EDA on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
 
 ```
+
+## Modeling
+
+Predict categorical distribution of grades (A, B, C, D, R) using pre-req data for a select number of core intermediate courses
+
+Can use a gradient boosting model
+
+```{r, include=F}
+#example url of model
+https://stackoverflow.com/questions/29454883/in-gbm-multinomial-dist-how-to-use-predict-to-get-categorical-output/29456904
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
