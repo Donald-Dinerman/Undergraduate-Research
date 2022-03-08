@@ -2,7 +2,7 @@
 # Undergradute Research
 
 
-*See the fully knitted project [here](https://donald-dinerman.github.io/Undergraduate-Research/)*.
+*See the fully knitted project [here](https://donald-dinerman.github.io/Undergraduate-Research/)*. (Make repo public to enable Github Pages).
 
 We worked with Carnegie Mellon's Statistics Adivising
 team to create data-backed insights that will support
