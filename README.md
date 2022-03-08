@@ -1,6 +1,9 @@
 
 # Undergradute Research
 
+
+*See the fully knitted project [here](https://donald-dinerman.github.io/Undergraduate-Research/)*.
+
 We worked with Carnegie Mellon's Statistics Adivising
 team to create data-backed insights that will support
 advising recommendations.
