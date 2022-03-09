@@ -25,6 +25,7 @@ library(zoo)
 library(kableExtra)
 library(stringr)
 library(ggplot2)
+library(shiny)
 ```
 
 ```{r}
@@ -43,22 +44,6 @@ econ_stat_elective_df = read_xlsx("core_elective_data.xlsx", sheet = 4)[-1,-1]
 stat_ml_core_df = read_xlsx("core_elective_data.xlsx", sheet = 5)[-1,-1]
 stat_ml_elective_df = read_xlsx("core_elective_data.xlsx", sheet = 6)[-1,-1]
 ```
-
-Questions:
-
-1.  For first enrolled, I assume F and S are Fall and Spring. But what is M? M is 1st summer term
-
-2.  For major, what is H00? H00 means undeclared
-
-3.  What does class_id signify? (e.g., 1 = freshman, ..., 4 = senior)
-
-4.  What is M and N for semester? first and second term in summer
-
-5.  There are instances where first enroll happens after the course semester. Does this mean the student enrolled after they took the course, what's up with that? can designate first semester of courses as first enroll variable
-
-6.  How to designate pre-reqs? label as go, from forward to back(e.g., took 401 lets see when and how you did in 226)
-
-7.  How to identify electives and core classes? course catalogs
 
 ## Prep Data
 
@@ -164,6 +149,9 @@ stat_df$econ_stat_elective = (stat_df$course %in% econ_stat_elective) %>% as.num
 
 stat_df$stat_ml_core = (stat_df$course %in% stat_ml_core) %>% as.numeric()
 stat_df$stat_ml_elective = (stat_df$course %in% stat_ml_elective) %>% as.numeric()
+
+stat_df$elective = ifelse(stat_df$stat_ml_elective == 1 | stat_df$econ_stat_elective == 1 |stat_df$stat_elective == 1, 1, 0)
+stat_df$core = ifelse(stat_df$stat_ml_core == 1 | stat_df$econ_stat_core == 1 |stat_df$stat_core == 1, 1, 0)
 ```
 
 ```{r}
@@ -413,7 +401,7 @@ clean_joined_updated_QPA_df$semester = factor(clean_joined_updated_QPA_df$semest
 
 # add a course as year 0, grade T if a student hasn't taken it
 add_prereq = function(input_df, prereq_to_add,
-                       replace_name = prereq_to_add[1], grade_to = "T",
+                       replace_name = prereq_to_add[1], grade_to = "TR",
                        major_in = c("STA", "ECOSTA", "STAMACH"), course_units = NA){
   
   input_df %>%
@@ -425,7 +413,7 @@ add_prereq = function(input_df, prereq_to_add,
             major.x = first(major.x),
             #graduation_year = first(graduation_year),
             course = replace_name,
-            grade = "T",
+            grade = grade_to,
             units = course_units) %>% 
   filter(have_prereq == 0 & major %in% major_in) %>% 
   select(-have_prereq) %>% 
@@ -444,13 +432,14 @@ unify_course_names = function(input_df, change_from, change_to){
 df = clean_joined_updated_QPA_df
   
 df_2 = df %>% 
-  add_prereq(., c(21111,21112,21120), 21120, course_units=10) %>% 
+  add_prereq(., c(21111,21112,21120), 21120, course_units = 10) %>% 
   add_prereq(., c(36200,36201,36220,36247), 36200) %>% 
   add_prereq(., c(21240,21241,21242), 21241) %>% 
   add_prereq(., 21127, major_in = "STAMACH") %>% 
   add_prereq(., 15112, major_in = "STAMACH") %>% 
   unify_course_names(., c(10401, 10601), 10301)
-df_2
+
+df_2 %>% head()
 
 #matrices_df <- filter(df_2, course %in% c(21240,21241,21242))
 #nrow(matrices_df %>% filter(grade == "T")) / nrow(matrices_df)
@@ -710,15 +699,15 @@ for(i in 1:3) {
 
 ## Model
 
-Outcome: Distribution of grades 
-Question: How would we check accuracy on test set if outcome is distribution? Wouldn't it have to be definitive like A B or at least an E(Distribution) like 3.35?
+Outcome: Distribution of grades Question: How would we check accuracy on test set if outcome is distribution? Wouldn't it have to be definitive like A B or at least an E(Distribution) like 3.35?
 
 Need to create wide formatted data, filtered by students who fulfilled the outcome course plus the respective pre-reqs(or mandatory courses)
 
 Can include GPA of the semester prior to taking the outcome course in the wide data
 
-colnames: student major pre-req 1, pr2, pr3, outcome, qpa
-values: id #   , major,  grade,  grade, grade, grade, qpa #
+colnames: student major pre-req 1, pr2, pr3, outcome, qpa 
+
+values: id # ,    major, grade, grade, grade, grade, qpa #
 
 ```{r}
 model_df_func = function(response_course, predictor_courses){
@@ -726,7 +715,7 @@ model_df_func = function(response_course, predictor_courses){
   filtered_courses = c(response_course, predictor_courses)
   letter_grades = c("A", "B", "C", "D", "R", "T")
                      
-  long_df = df_2 %>%
+  long_df = df_2 %>% #Note that the base df here is df_2. This may change in the future as we add more transfer credit courses
     group_by(student) %>%
     filter(all(filtered_courses %in% course)) %>% #only take students if they have all of filtered courses
     filter(course %in% filtered_courses & grade %in% letter_grades) %>% #filter to the filtered courses with letter grades
@@ -759,8 +748,53 @@ model_df_func = function(response_course, predictor_courses){
 
 }
 
-model_df_func(response_course = 36402, predictor_courses = c(21256, 36401))
+model_df_func(response_course = 36402, predictor_courses = c(21256, 36225, 36226, 36401)) %>% head()
 ```
+
+
+
+## Shiny App
+
+Make preliminary Shiny App that can at least host the functional EDA for now
+
+```{r}
+#https://vimeo.com/rstudioinc/review/131218530/212d8a5a7a?#comment_14696574
+#Add sidebar for modeling (Empty for now) and interactive/functional EDA 
+#Can potentially add filtering component to shiny app (make input itself reactive based on filtering--> how)
+course_options = prop_class_grade %>% filter(n_students > 100) %>% pull(1) %>% sort() %>% as.character()
+
+#ui
+ui = fluidPage(
+  titlePanel(title = h4("Course EDA", align = "center")),
+  sidebarPanel( 
+    selectInput(inputId = "course_id", label = "Course:", choices = course_options),
+    selectInput(inputId = "label_id", label = "Text Labels:", choices = c(T, F)),
+  mainPanel(plotOutput("plot1"))
+    )
+  )
+```
+
+```{r}
+#server
+server = function(input,output){
+
+  output$plot1 <- renderPlot({
+    
+    course_grade_func(input$course_id, label = input$label_id)
+  }, height = 400, width = 800)
+}
+```
+
+```{r}
+#run app
+shinyApp(ui = ui, server = server)
+```
+
+
+
+
+
+
 
 
 
