@@ -26,6 +26,8 @@ library(kableExtra)
 library(stringr)
 library(ggplot2)
 library(shiny)
+library(shinydashboard)
+library(markdown)
 ```
 
 ```{r}
@@ -757,9 +759,50 @@ model_df_func(response_course = 36402, predictor_courses = c(21256, 36225, 36226
 
 Make preliminary Shiny App that can at least host the functional EDA for now
 
+cheat sheet: https://shiny.rstudio.com/images/shiny-cheatsheet.pdf
+
+```{r}
+#example grade distribution (non-reactive
+#going to have to create reactive element dependent on 
+letter_grades = c("A", "B", "C", "D", "R")
+
+grade_prob = c(0.4, 0.2, 0.2, 0.1, 0.1)
+
+grade_df = data.frame(letter_grades, grade_prob)
+
+grade_dist_plot_func = function(df = grade_df){
+
+  positions = df %>% pull(1) %>% rev()
+
+  p = ggplot(df, aes(x = letter_grades, y = grade_prob)) +
+    geom_col(col = "Black", fill = "Steelblue") +
+    scale_x_discrete(limits = positions) +
+    coord_flip() +
+    labs(title = "Predicted Grade Distribution", x = "Letter Grades", y = "Probability")
+  
+  print(p)
+}
+
+grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
+  
+  numeric_grades = case_when(
+    letter == "A" ~ 4,
+    letter == "B" ~ 3,
+    letter == "C" ~ 2,
+    letter == "D" ~ 1,
+    letter == "R" ~ 0,
+  )
+
+  grade_ev = sum(numeric_grades * probabilities)
+
+  grade_ev
+}
+
+grade_dist_plot_func()
+grade_ev_func()
+```
 ```{r}
 #https://vimeo.com/rstudioinc/review/131218530/212d8a5a7a?#comment_14696574
-#Add sidebar for modeling (Empty for now) and interactive/functional EDA 
 #Can potentially add filtering component to shiny app (make input itself reactive based on filtering--> how)
 course_options = prop_class_grade %>% filter(n_students > 100) %>% pull(1) %>% sort() %>% as.character()
 
@@ -775,13 +818,139 @@ ui = fluidPage(
 ```
 
 ```{r}
-#server
+#Dashboard UI
+
+header <- dashboardHeader(title = "My Dashboard")
+
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+    menuItem("EDA", tabName = "eda", icon = icon("chart-bar")),
+    menuItem("Predictive Modeling", icon = icon("grain", lib="glyphicon"), tabName = "pred_mod")
+  )
+)
+
+body <- dashboardBody(
+  tabItems(
+    tabItem(tabName = "eda",
+      fluidPage(
+  titlePanel(title = h4("Course EDA", align = "center")),
+  sidebarPanel( 
+    selectInput(inputId = "course_id", label = "Course:", choices = course_options),
+    selectInput(inputId = "label_id", label = "Text Labels:", choices = c(T, F)),
+  mainPanel(plotOutput("plot1"))
+    )
+  )
+    ),
+
+    tabItem(tabName = "pred_mod",
+      fluidPage(
+  titlePanel(title = h4("Grade Prediction", align = "center")),
+  sidebarPanel( 
+    selectInput(inputId = "course_grade_1", label = "21256:", choices = letter_grades),
+    selectInput(inputId = "course_grade_2", label = "36225:", choices = letter_grades),
+    selectInput(inputId = "course_grade_3", label = "36226:", choices = letter_grades),
+    selectInput(inputId = "course_grade_4", label = "36401:", choices = letter_grades),
+    
+  mainPanel(plotOutput("plot2"),
+            textOutput("text1"),
+    tags$head(tags$style("#text1{color: red;
+                                 font-size: 20px;
+                                 font-style: italic;
+                                 }"
+                         )))))
+    )
+  )
+)
+
+ui = dashboardPage(header, sidebar, body)
+```
+
+```{r}
+#Navbar UI (https://shiny.rstudio.com/gallery/navbar-example.html)
+top_four_retake = top_n_classes[1:4] #to get course number for retakes
+
+ui = navbarPage("Stat & DS Department",
+           
+  tabPanel("Predictive Modeling",
+      
+           fluidPage(
+            
+             titlePanel(title = h4("Grade Prediction", align = "center")),
+              
+             sidebarLayout(
+               
+             sidebarPanel( 
+                selectInput(inputId = "course_outcome_1", label = "Predict this course:", choices = top_four_retake), #top_four_retake is a placeholder
+                selectInput(inputId = "course_grade_1", label = "21256:", choices = letter_grades),
+                selectInput(inputId = "course_grade_2", label = "36225:", choices = letter_grades),
+                selectInput(inputId = "course_grade_3", label = "36226:", choices = letter_grades),
+                selectInput(inputId = "course_grade_4", label = "36401:", choices = letter_grades)),
+    
+  mainPanel(plotOutput("plot1"),
+            textOutput("text1"),
+    tags$head(tags$style("#text1{color: black;
+                                 font-size: 20px;
+                                 font-style: italic;
+                                 }"
+                         )))))
+  ),
+  
+  navbarMenu("EDA",
+    tabPanel("Course Grade Distribution",
+             
+       fluidPage(
+        
+        titlePanel(title = h4("Course Grade Distribution", align = "center")),
+        
+        sidebarLayout(
+        sidebarPanel( 
+            selectInput(inputId = "course_id", label = "Course:", choices = course_options),
+            selectInput(inputId = "label_id", label = "Text Labels:", choices = c(T, F))),
+      
+        mainPanel(plotOutput("plot2")))
+    )
+  ),
+  
+    tabPanel("Retake Grade Distribution",
+                   
+       fluidPage(
+        
+        titlePanel(title = h4("Retake Grade Distribution", align = "center")),
+          
+        sidebarLayout(
+          
+        sidebarPanel( 
+            selectInput(inputId = "retake_course_id", label = "Course:", choices = top_four_retake),
+            selectInput(inputId = "retake_label_id", label = "Text Labels:", choices = c(T, F))),
+      
+        mainPanel(plotOutput("plot3")
+                  )
+        )
+    )
+  )
+    )
+  )
+```
+
+
+```{r}
+#server (ui)
 server = function(input,output){
 
   output$plot1 <- renderPlot({
+    grade_dist_plot_func()}, height = 400, width = 800)
+  
+  output$text1 <- renderText({paste("Your expected grade is:", grade_ev_func())})
+  
+  output$plot2 <- renderPlot({
     
     course_grade_func(input$course_id, label = input$label_id)
   }, height = 400, width = 800)
+  
+   output$plot3 <- renderPlot({
+     retake_course_grade_func(input$retake_course_id, label = input$retake_label_id)
+   },  height = 400, width = 800)
+   
 }
 ```
 
