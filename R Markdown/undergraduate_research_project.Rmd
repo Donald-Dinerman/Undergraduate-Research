@@ -480,18 +480,24 @@ test = clean_joined_updated_QPA_df %>% #to get students in course by major
   group_by(major) %>%
   count(course, name = "n_course")
 
-percentage_course_by_major = left_join(test, hold, "major") %>%
+top_n_course_by_major = function(n_course){
+
+  percentage_course_by_major = left_join(test, hold, "major") %>%
   mutate(prop = round((n_course/count)*100, 2)) %>%
   group_by(major) %>%
-  slice_max(n = 3, order_by = prop, with_ties = F) %>%
+  slice_max(n = n_course, order_by = prop, with_ties = F) %>%
   arrange(major, -prop)
 
 colnames(percentage_course_by_major) = c("Major", "Course", "Students Taken", "Students in Major", "% of Students")
 
 percentage_course_by_major[,c(2,3,5)] %>%
-  kbl(caption = "Table 2: Top 3 courses taken across majors", booktabs = T) %>% 
-  kable_paper("hover", full_width = T) %>%
-    pack_rows(index = c("ECOSTA" = 3, "STA" = 3, "STAMACH" = 3))
+  kbl(caption = paste("Top", n_course, "courses taken across majors"), booktabs = T) %>% 
+      kable_styling("striped", full_width = T, font_size = 20) %>%
+      pack_rows(index = c("ECOSTA" = n_course, "STA" = n_course, "STAMACH" = n_course))
+
+}
+
+top_n_course_by_major(2)
 ```
 
 ```{r}
@@ -512,9 +518,14 @@ retake_course_counts = course_counts %>%
 
 colnames(retake_course_counts) = c("Course", "Students Retaken", "Retake %") 
 
-head(retake_course_counts, 5) %>%  
-  kbl(caption = "Table 3: Top 5 courses retaken", booktabs = T) %>% 
-  kable_paper("hover", full_width = T)
+top_n_retake_tab = function(n_retake){
+  
+  head(retake_course_counts, n_retake) %>%  
+    kbl(caption = paste("Top", n_retake, "courses retaken"), booktabs = T) %>% 
+    kable_styling("striped", full_width = T, font_size = 20)
+}
+
+top_n_retake_tab(n_retake = 3)
 ```
 
 ### Graphs
@@ -737,7 +748,7 @@ model_df_func = function(response_course, predictor_courses){
   QPA_values = retake_remedy %>%
     filter(student %in% full_students) %>%
     group_by(student) %>%
-    slice(length(filtered_courses) - 1) %>%
+    slice(length(filtered_courses) - 1) %>% #this should be ok bc you wouldn't select a pred course in the same sem as outcome
     pull(6)
 
   example_model_df = retake_remedy %>%
@@ -766,7 +777,7 @@ cheat sheet: https://shiny.rstudio.com/images/shiny-cheatsheet.pdf
 #going to have to create reactive element dependent on 
 letter_grades = c("A", "B", "C", "D", "R")
 
-grade_prob = c(0.4, 0.2, 0.2, 0.1, 0.1)
+grade_prob = c(0.4, 0.2, 0.2, 0.1, 0.1) #this information from model; model will have to be reactive to outcome course selection
 
 grade_df = data.frame(letter_grades, grade_prob)
 
@@ -869,7 +880,7 @@ ui = dashboardPage(header, sidebar, body)
 #Navbar UI (https://shiny.rstudio.com/gallery/navbar-example.html)
 top_four_retake = top_n_classes[1:4] #to get course number for retakes
 
-ui = navbarPage("Stat & DS Department",
+ui = navbarPage(title = "Stat & DS Department",
            
   tabPanel("Predictive Modeling",
       
@@ -895,7 +906,22 @@ ui = navbarPage("Stat & DS Department",
                          )))))
   ),
   
-  navbarMenu("EDA",
+  navbarMenu("Course EDA",
+             
+    tabPanel("Course Enrollement Table",
+             
+    fluidPage(
+        
+        titlePanel(title = h4("Course Enrollement Frequency", align = "center")),
+        
+        sidebarLayout(
+        sidebarPanel( 
+            numericInput(inputId = "n_course", label = "Number of Courses:", value = 3, min = 1, max = 10),
+            ),
+      
+        mainPanel(tableOutput("table1"))))         
+             ),     
+             
     tabPanel("Course Grade Distribution",
              
        fluidPage(
@@ -909,8 +935,24 @@ ui = navbarPage("Stat & DS Department",
       
         mainPanel(plotOutput("plot2")))
     )
-  ),
+  )),
   
+  navbarMenu("Retake EDA",
+             
+    tabPanel("Retake Frequency Table",
+             
+    fluidPage(
+        
+        titlePanel(title = h4("Course Retake Frequency", align = "center")),
+        
+        sidebarLayout(
+        sidebarPanel( 
+            numericInput(inputId = "n_retake", label = "Number of Courses:", value = 3, min = 1, max = 10),
+            ),
+      
+        mainPanel(tableOutput("table2"))))         
+             ),             
+             
     tabPanel("Retake Grade Distribution",
                    
        fluidPage(
@@ -934,14 +976,21 @@ ui = navbarPage("Stat & DS Department",
 
 
 ```{r}
-#server (ui)
+#server (navbar)
 server = function(input,output){
 
-  output$plot1 <- renderPlot({
-    grade_dist_plot_func()}, height = 400, width = 800)
+  #tables
+  output$table1 <- renderText({top_n_course_by_major(n_course = input$n_course)})
   
+  output$table2 <- renderText({top_n_retake_tab(n_retake = input$n_retake)})
+
+  #text
   output$text1 <- renderText({paste("Your expected grade is:", grade_ev_func())})
   
+  #plots
+  output$plot1 <- renderPlot({
+    grade_dist_plot_func()}, height = 400, width = 800)
+    
   output$plot2 <- renderPlot({
     
     course_grade_func(input$course_id, label = input$label_id)
@@ -958,18 +1007,3 @@ server = function(input,output){
 #run app
 shinyApp(ui = ui, server = server)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
