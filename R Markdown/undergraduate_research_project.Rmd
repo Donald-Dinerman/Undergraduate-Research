@@ -587,6 +587,71 @@ for(i in 1:5) {
 ```
 
 ```{r}
+#EV course performance by major
+letter_grades = c("A", "B", "C", "D", "R")
+
+course_major_grade_df = clean_joined_updated_QPA_df %>%
+  group_by(course, major, grade) %>%
+  summarise(count = n()) %>%
+  filter(grade %in% letter_grades)
+
+numeric_grade =  course_major_grade_df %>% 
+  pull(3) %>%
+  recode(., "A" = 4, "B" = 3, "C" = 2, "D" = 1, "R" = 0)
+
+course_major_grade_df_numeric = course_major_grade_df %>%
+  cbind(numeric_grade = numeric_grade) %>%
+  select(-grade)
+
+ev_course_list = course_major_grade_df %>% #for ui select input
+  group_by(course) %>%
+  summarise(total_n = sum(count)) %>%
+  arrange(-total_n) %>%
+  pull(1)
+
+ev_grade_df = course_major_grade_df_numeric %>%
+  group_by(course, major) %>%
+  summarise(ev_grade = sum(numeric_grade * count),
+            number = sum(count),
+            fin_ev_grade = round(ev_grade/number, 2))
+
+course_performance_by_major = function(course_n, table = F){
+
+  filtered_df = filter(ev_grade_df, course == course_n)
+
+  output_table = filtered_df[, c(2, 4)]
+
+  colnames(output_table) = c("Major", "Number of Students")
+  
+  kbl_table = output_table %>%
+    kbl(caption = "") %>% 
+    kable_styling("striped", full_width = T, font_size = 20)
+
+  p = ggplot(filtered_df, aes(x = major, fill = major ,y = fin_ev_grade)) +
+    geom_col(show.legend = F, col = "Black") + 
+    geom_text(aes(label = fin_ev_grade), position = position_dodge (width = 0.9), vjust = -0.25) +
+    ylim(0,4) +
+    labs(title = paste("Average Grade by Major for", course_n),
+        x = "Majors",
+        y = "Average Grade",
+        fill = "Major")
+
+  list_content = list(p, kbl_table)
+  
+  if(table == T){
+    print(list_content[[2]])
+  }
+  
+  if(table == F){
+    print(list_content[[1]])
+  }
+}
+
+course_performance_by_major(course_n = 36226, table = F)
+```
+
+
+```{r}
 #how kids do their first time vs their second time taking a class
 simple_filter_retake = clean_joined_updated_QPA_df %>%
   group_by(student, semester) %>%
@@ -726,7 +791,6 @@ values: id # ,    major, grade, grade, grade, grade, qpa #
 model_df_func = function(response_course, predictor_courses){
 
   filtered_courses = c(response_course, predictor_courses)
-  letter_grades = c("A", "B", "C", "D", "R", "T")
                      
   long_df = df_2 %>% #Note that the base df here is df_2. This may change in the future as we add more transfer credit courses
     group_by(student) %>%
@@ -1060,7 +1124,27 @@ ui = navbarPage(title = "Stat & DS Department",
       
         mainPanel(plotOutput("plot2")))
     )
-  )),
+  ),
+  
+    tabPanel("Course Performance by Major",
+             
+       fluidPage(
+        
+        titlePanel(title = h4("Course Performance by Major", align = "center")),
+        
+        sidebarLayout(
+        sidebarPanel( 
+            selectInput(inputId = "course_id_by_major", label = "Course:", choices = ev_course_list)),
+      
+        mainPanel(
+          column(width = 8, plotOutput("plot3")), 
+          column(width = 8, tableOutput("table2"))#issue with table 2 rendering outside of app (shiny.tag.list)
+ )
+    )
+  ))
+  
+  ),
+
   
   navbarMenu("Retake EDA",
              
@@ -1075,7 +1159,7 @@ ui = navbarPage(title = "Stat & DS Department",
             numericInput(inputId = "n_retake", label = "Number of Courses:", value = 3, min = 1, max = 10),
             ),
       
-        mainPanel(tableOutput("table2"))))         
+        mainPanel(tableOutput("table3"))))         
              ),             
              
     tabPanel("Retake Grade Distribution",
@@ -1090,7 +1174,7 @@ ui = navbarPage(title = "Stat & DS Department",
             selectInput(inputId = "retake_course_id", label = "Course:", choices = top_four_retake),
             selectInput(inputId = "retake_label_id", label = "Text Labels:", choices = c(T, F))),
       
-        mainPanel(plotOutput("plot3")
+        mainPanel(plotOutput("plot4")
                   )
         )
     )
@@ -1106,7 +1190,10 @@ server = function(input,output){
   #tables
   output$table1 <- renderText({top_n_course_by_major(n_course = input$n_course)})
   
-  output$table2 <- renderText({top_n_retake_tab(n_retake = input$n_retake)})
+  output$table2 <- renderText({course_performance_by_major(course_n = input$course_id_by_major, table = T)}) 
+  #kbl and data tables rendering outside of app (issue on ui side) (shiny.tag.list)
+  
+  output$table3 <- renderText({top_n_retake_tab(n_retake = input$n_retake)})
 
   #text
   output$text1 <- renderText({paste("Your expected grade is:", grade_ev_func())})
@@ -1120,7 +1207,11 @@ server = function(input,output){
     course_grade_func(input$course_id, label = input$label_id)
   }, height = 400, width = 800)
   
-   output$plot3 <- renderPlot({
+  output$plot3 <- renderPlot({
+    course_performance_by_major(course_n = input$course_id_by_major, table = F) #add table integration later
+  })
+  
+   output$plot4 <- renderPlot({
      retake_course_grade_func(input$retake_course_id, label = input$retake_label_id)
    },  height = 400, width = 800)
    
