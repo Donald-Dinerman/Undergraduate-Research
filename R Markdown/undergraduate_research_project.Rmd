@@ -230,32 +230,6 @@ discrep_fixed_df = stat_df[,-4] %>% #remove old first_enrolled
   select(student, class_id, major, first_enrolled, everything()) #set order we view variables
 ```
 
-*this needs work*(may not need grad year data/going to get this from Amanda)
-
-```{r}
-#Calculate graduation year
-#Can instead: find first semester entry, to the substr thing w semester but conditional on class_id
-#may have to calculate grad year depending on whether first_enrolled is fall (spring grad, next year) or spring (winter grad same year)
-
-
-#can't calculate grad year like this bc some student's last semester in data is there sophomore and junior year
-#also would need to at least arrange by semester
-
-#grad_year = discrep_fixed_df %>% 
-#  group_by(student) %>% 
-#  arrange(first_enrolled) %>%
-#  summarize_all(last) %>% 
-#  mutate(prelim_year = 2000 + as.numeric(substr(first_enrolled,2,3)),
-#         graduation_year = prelim_year + class_id) %>% 
-# select(student, graduation_year)
-
-#df = stat_df %>% 
-#  left_join(., grad_year, "student") %>% 
-#  select(-first_enrolled) %>% 
-#  rename(semester = semester.x, first_enrolled = semester.y) %>% 
-#  select(student, class_id, major, first_enrolled, graduation_year, everything())
-```
-
 ```{r}
 #Some students switched majors midway
 #using merge, assign students who switched majors midway to the major they have in their last semester
