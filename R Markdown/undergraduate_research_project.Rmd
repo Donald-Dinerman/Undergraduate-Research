@@ -912,15 +912,17 @@ ui = dashboardPage(header, sidebar, body)
 ```
 
 ```{r}
-#Navbar UI (https://shiny.rstudio.com/gallery/navbar-example.html)
-##need to build a dynamic ui that reacts to user input of course_outcome_1 (https://shiny.rstudio.com/articles/dynamic-ui.html): use conditional
-#add image to right of navbar to replace title
+#Navbar ui: (https://shiny.rstudio.com/gallery/navbar-example.html)
+##Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
+##Bugs: image rendering, kbl table rendering outside of app
 
 top_four_outcome_pred = c(36402, 36401, 73374, 15351) %>% sort() %>% as.character()
 
-ui = navbarPage(title = "Stat & DS Department",
-           
-  tabPanel("Predictive Modeling",
+top_four_retake = first_leg %>% head(4) %>% pull(1)
+
+ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", deleteFile = F), "Stat and DS Advising"), #add image (bug: not locating image file)
+                
+      tabPanel("Predictive Modeling",
       
            fluidPage(
             
