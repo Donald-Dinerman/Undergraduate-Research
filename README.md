@@ -8,7 +8,7 @@ We worked with Carnegie Mellon's Statistics Adivising
 team to create data-backed insights that will support
 advising recommendations.
 
-We designed a predictive model using random forests 
+We designed predictive models using random forests 
 that takes in a student's academic history and predicts 
 their future course performance.
 
