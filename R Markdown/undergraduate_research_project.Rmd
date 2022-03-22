@@ -809,7 +809,6 @@ model_df_func(response_course = 36402, predictor_courses = c(21256, 36225, 36226
 ```
 
 
-
 ## Shiny App
 
 Make preliminary Shiny App that can at least host the functional EDA for now
@@ -915,105 +914,8 @@ ui = dashboardPage(header, sidebar, body)
 ```{r}
 #Navbar UI (https://shiny.rstudio.com/gallery/navbar-example.html)
 ##need to build a dynamic ui that reacts to user input of course_outcome_1 (https://shiny.rstudio.com/articles/dynamic-ui.html): use conditional
-top_four_retake = top_n_classes[1:4] #to get course number for retakes
+#add image to right of navbar to replace title
 
-ui = navbarPage(title = "Stat & DS Department",
-           
-  tabPanel("Predictive Modeling",
-      
-           fluidPage(
-            
-             titlePanel(title = h4("Grade Prediction", align = "center")),
-              
-             sidebarLayout( 
-               
-             sidebarPanel( 
-                selectInput(inputId = "course_outcome_1", label = "Predict this course:", choices = top_four_retake), #top_four_retake is a placeholder
-                selectInput(inputId = "course_grade_1", label = "21256:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_2", label = "36225:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_3", label = "36226:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_4", label = "36401:", choices = letter_grades_transfer),
-                numericInput(inputId = "gpa", label = "Major GPA:", value = 3, min = 0, max = 4, step = 0.01),
-            ),
-    
-  mainPanel(plotOutput("plot1"),
-            textOutput("text1"),
-    tags$head(tags$style("#text1{color: black;
-                                 font-size: 20px;
-                                 font-style: italic;
-                                 }"
-                         )))))
-  ),
-  
-  navbarMenu("Course EDA",
-             
-    tabPanel("Course Enrollement Table",
-             
-    fluidPage(
-        
-        titlePanel(title = h4("Course Enrollement Table", align = "center")),
-        
-        sidebarLayout(
-        sidebarPanel( 
-            numericInput(inputId = "n_course", label = "Number of Courses:", value = 3, min = 1, max = 10),
-            ),
-      
-        mainPanel(tableOutput("table1"))))         
-             ),     
-             
-    tabPanel("Course Grade Distribution",
-             
-       fluidPage(
-        
-        titlePanel(title = h4("Course Grade Distribution", align = "center")),
-        
-        sidebarLayout(
-        sidebarPanel( 
-            selectInput(inputId = "course_id", label = "Course:", choices = course_options),
-            selectInput(inputId = "label_id", label = "Text Labels:", choices = c(T, F))),
-      
-        mainPanel(plotOutput("plot2")))
-    )
-  )),
-  
-  navbarMenu("Retake EDA",
-             
-    tabPanel("Retake Frequency Table",
-             
-    fluidPage(
-        
-        titlePanel(title = h4("Retake Frequency Table", align = "center")),
-        
-        sidebarLayout(
-        sidebarPanel( 
-            numericInput(inputId = "n_retake", label = "Number of Courses:", value = 3, min = 1, max = 10),
-            ),
-      
-        mainPanel(tableOutput("table2"))))         
-             ),             
-             
-    tabPanel("Retake Grade Distribution",
-                   
-       fluidPage(
-        
-        titlePanel(title = h4("Retake Grade Distribution", align = "center")),
-          
-        sidebarLayout(
-          
-        sidebarPanel( 
-            selectInput(inputId = "retake_course_id", label = "Course:", choices = top_four_retake),
-            selectInput(inputId = "retake_label_id", label = "Text Labels:", choices = c(T, F))),
-      
-        mainPanel(plotOutput("plot3")
-                  )
-        )
-    )
-  )
-    )
-  )
-```
-
-```{r}
 top_four_outcome_pred = c(36402, 36401, 73374, 15351) %>% sort() %>% as.character()
 
 ui = navbarPage(title = "Stat & DS Department",
