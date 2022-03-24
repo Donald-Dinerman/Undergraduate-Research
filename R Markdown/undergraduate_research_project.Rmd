@@ -589,17 +589,9 @@ ev_grade_df = course_major_grade_df_numeric %>%
             number = sum(count),
             fin_ev_grade = round(ev_grade/number, 2))
 
-course_performance_by_major = function(course_n, table = F){
+course_performance_by_major_plot = function(course_n){
 
   filtered_df = filter(ev_grade_df, course == course_n)
-
-  output_table = filtered_df[, c(2, 4)]
-
-  colnames(output_table) = c("Major", "Number of Students")
-  
-  kbl_table = output_table %>%
-    kbl(caption = "") %>% 
-    kable_styling("striped", full_width = T, font_size = 20)
 
   p = ggplot(filtered_df, aes(x = major, fill = major ,y = fin_ev_grade)) +
     geom_col(show.legend = F, col = "Black") + 
@@ -610,18 +602,23 @@ course_performance_by_major = function(course_n, table = F){
         y = "Average Grade",
         fill = "Major")
 
-  list_content = list(p, kbl_table)
-  
-  if(table == T){
-    print(list_content[[2]])
-  }
-  
-  if(table == F){
-    print(list_content[[1]])
-  }
+  p
 }
 
-course_performance_by_major(course_n = 36226, table = F)
+course_performance_by_major_table = function(course_n){
+
+  filtered_df = filter(ev_grade_df, course == course_n)
+
+  output_table = filtered_df[, c(2, 4)]
+
+  colnames(output_table) = c("Major", "Number of Students")
+  
+  kbl_table = output_table %>%
+    kbl(caption = "") %>% 
+    kable_styling("striped", full_width = T, font_size = 20)
+  
+  kbl_table
+}
 ```
 
 
@@ -914,7 +911,7 @@ ui = dashboardPage(header, sidebar, body)
 ```{r}
 #Navbar ui: (https://shiny.rstudio.com/gallery/navbar-example.html)
 ##Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
-##Bugs: image rendering, kbl table rendering outside of app
+##Bugs: image rendering
 
 top_four_outcome_pred = c(36402, 36401, 73374, 15351) %>% sort() %>% as.character()
 
@@ -1015,9 +1012,8 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
             selectInput(inputId = "course_id_by_major", label = "Course:", choices = ev_course_list)),
       
         mainPanel(
-          column(width = 8, plotOutput("plot3")), 
-          column(width = 8, tableOutput("table2"))#issue with table 2 rendering outside of app (shiny.tag.list)
- )
+          plotOutput("plot3"),tableOutput("table2")) #issue with table 2 rendering outside of app (shiny.tag.list)
+ 
     )
   ))
   
@@ -1068,9 +1064,8 @@ server = function(input,output){
   #tables
   output$table1 <- renderText({top_n_course_by_major(n_course = input$n_course)})
   
-  output$table2 <- renderText({course_performance_by_major(course_n = input$course_id_by_major, table = T)}) 
-  #kbl and data tables rendering outside of app (issue on ui side) (shiny.tag.list)
-  
+  output$table2 <- renderText({course_performance_by_major_table(course_n = input$course_id_by_major)}) 
+
   output$table3 <- renderText({top_n_retake_tab(n_retake = input$n_retake)})
 
   #text
@@ -1086,7 +1081,7 @@ server = function(input,output){
   }, height = 400, width = 800)
   
   output$plot3 <- renderPlot({
-    course_performance_by_major(course_n = input$course_id_by_major, table = F) #add table integration later
+    course_performance_by_major_plot(course_n = input$course_id_by_major)
   })
   
    output$plot4 <- renderPlot({
