@@ -33,6 +33,9 @@ library(markdown)
 ```{r}
 #main data set
 stat_df = read.csv("stats_data.csv")
+
+#updated data set
+stat_df = read.csv("stats_data_updated.csv")
 ```
 
 ```{r}
@@ -143,6 +146,10 @@ stat_ml_elective = get_unique_classes(stat_ml_elective_df)[stat_ml_elective_inde
 ```{r}
 #Assign course classification columns in main df
 
+stat_df = stat_df %>% replace(is.na(.), 99000) #replace NA courses with 99000 to classify 
+
+stat_df$non_major_course = (stat_df$course %in% 99000) %>% as.numeric() #label 99000 as non major courses
+
 stat_df$stat_core = (stat_df$course %in% stat_core) %>% as.numeric()
 stat_df$stat_elective = (stat_df$course %in% stat_elective) %>% as.numeric()
 
@@ -224,7 +231,8 @@ first_sem = rbind(first_sem_discrep_fin, first_enroll_non_discrep) %>%
 
 first_sem$discrep_var = factor(first_sem$discrep_var, levels = reference_level)
 
-discrep_fixed_df = stat_df[,-4] %>% #remove old first_enrolled
+discrep_fixed_df = stat_df %>% 
+  select(-first_enrolled) %>% #remove old first_enrolled
   left_join(., first_sem, "student") %>%
   rename(first_enrolled = discrep_var) %>% #rename variables
   select(student, class_id, major, first_enrolled, everything()) #set order we view variables
@@ -321,46 +329,74 @@ basic_grade_df = undergrad_df[undergrad_df$number_grade != 100,] #don't calculat
 basic_grade_df$quality_points = basic_grade_df$units*basic_grade_df$number_grade
 
 #QPA by semester
-
-non_updating_QPA = basic_grade_df %>% 
+non_updating_QPA_total_df = basic_grade_df %>% 
   group_by(student, semester) %>%
   summarise(n_courses = n(),
             QP_sum = sum(quality_points), 
             unit_sum = sum(units), 
-            QPA = round(QP_sum/unit_sum,2)
+            sem_total_QPA = round(QP_sum/unit_sum,2)
             )
 
-#create an updating QPA that is weighed by previous semesters (using cumulative sums)
-updating_QPA = non_updating_QPA %>%
+##QPA by semester (major only: filter(., course != 99000))
+non_updating_QPA_major_df = basic_grade_df %>%
+  filter(course != 99000) %>%
+  group_by(student, semester) %>%
+  summarise(n_courses = n(),
+            QP_sum = sum(quality_points), 
+            unit_sum = sum(units), 
+            sem_major_QPA = round(QP_sum/unit_sum,2)
+            )
+
+
+#Updating QPA (using cumulative sums)
+QPA_total_df = non_updating_QPA_total_df %>%
   group_by(student) %>%
-  summarise(semester, 
+  summarise(semester,
+            sem_total_QPA,
             cumulative_QP = cumsum(QP_sum),
             cumulative_unit = cumsum(unit_sum),
-            updating_QPA = round(cumulative_QP/cumulative_unit, 2)) %>%
-  select(student, semester, updating_QPA)
+            updating_total_QPA = round(cumulative_QP/cumulative_unit, 2)) %>%
+  select(student, semester, updating_total_QPA, sem_total_QPA)
+
+##Updating QPA by semester
+QPA_major_df = non_updating_QPA_major_df %>%
+  group_by(student) %>%
+  summarise(semester,
+            sem_major_QPA,
+            cumulative_QP = cumsum(QP_sum),
+            cumulative_unit = cumsum(unit_sum),
+            updating_major_QPA = round(cumulative_QP/cumulative_unit, 2)) %>%
+  select(student, semester, updating_major_QPA, sem_major_QPA)
+
+#Merge total and major QPA df by student and semester
+QPA_merged = left_join(QPA_total_df, QPA_major_df, by = c(c("student", "semester")))
 
 #create all combinations with students and semesters
-QPA_students = pull(updating_QPA, 1)
+QPA_students = pull(QPA_merged, 1)
 leveled_semester = factor(reference_level, levels = reference_level)
 
 student_semester_combo_df = tidyr::crossing(student = QPA_students, semester = leveled_semester)
 
-#left join with updating_QPA
-intermediate_combo_QPA = left_join(student_semester_combo_df, updating_QPA, by = c("student", "semester"))
+#left join with QPA_merged
+intermediate_combo_QPA = left_join(student_semester_combo_df, QPA_merged, by = c("student", "semester"))
 
 #Fill NA with previous QPA from student's semester grouped by student
 combo_QPA = intermediate_combo_QPA %>%
   group_by(student) %>% #information being lost with na.locf (e.g., s0001 is 20 entries instead of 22) --> change na.rm = T to F
-  summarise(semester, QPA = na.locf(updating_QPA, na.rm = F)) #its dropping the NAs after last entry for student i related with student
+  summarise(semester, 
+            updating_total_QPA = na.locf(updating_total_QPA, na.rm = F), #its dropping the NAs after last entry for student i related with student
+            sem_total_QPA = na.locf(sem_total_QPA, na.rm = F),
+            updating_major_QPA = na.locf(updating_major_QPA, na.rm = F),
+            sem_major_QPA = na.locf(sem_major_QPA, na.rm = F)) 
 
 #left_join filled combo df with the main one by student and semester
 
 joined_updated_QPA_df = left_join(undergrad_df, combo_QPA, by = c("student", "semester"))
 
-# joined_updated_QPA_df[is.na(joined_updated_QPA_df),] %>% nrow() = 10
+# joined_updated_QPA_df[is.na(joined_updated_QPA_df),] %>% nrow() = 168
 
 # Check the QPA NA
-clean_joined_updated_QPA_df = na.omit(joined_updated_QPA_df) #removes 10 rows with NAs
+clean_joined_updated_QPA_df = na.omit(joined_updated_QPA_df) #removes 168 rows with NAs
 
 clean_joined_updated_QPA_df$semester = factor(clean_joined_updated_QPA_df$semester, levels = reference_level) #set factor and level
 
@@ -431,6 +467,8 @@ General Note: Need to adjust df on EDA to reflect the most up to date wrangled d
 #make proportion table for courses
 #e.g., 0.001 kids take 21-366
 
+clean_joined_updated_QPA_df = clean_joined_updated_QPA_df %>% filter(course != 99000) #remove NA courses unrelated to major
+
 n_students = clean_joined_updated_QPA_df$student %>% unique() %>% length()
 
 prop_tab = (table(clean_joined_updated_QPA_df$course) / n_students) %>% round(4) #round by 4 so that percentage is rounded by 2
@@ -471,7 +509,7 @@ percentage_course_by_major[,c(2,3,5)] %>%
 
 }
 
-top_n_course_by_major(2)
+#top_n_course_by_major(3)
 ```
 
 ```{r}
@@ -499,47 +537,54 @@ top_n_retake_tab = function(n_retake){
     kable_styling("striped", full_width = T, font_size = 20)
 }
 
-top_n_retake_tab(n_retake = 3)
+#top_n_retake_tab(n_retake = 3)
 ```
 
 ### Graphs
 
 ```{r}
-#Grade distribution function by course
-#Grouping by class_id isn't informative due to sample size issues
-
-class_grade = table(clean_joined_updated_QPA_df$course, clean_joined_updated_QPA_df$grade) %>% 
+class_grade_by_major = table(clean_joined_updated_QPA_df$course, clean_joined_updated_QPA_df$grade, clean_joined_updated_QPA_df$major) %>% 
   as.data.frame() %>%
   pivot_wider(names_from = Var2, values_from = Freq) %>%
-  mutate(n_students = rowSums(.[2:10])) %>%
+  mutate(n_students = rowSums(.[3:11])) %>%
+  rename(Course = Var1, Major = Var3)
+
+class_grade_all_majors = table(clean_joined_updated_QPA_df$course, clean_joined_updated_QPA_df$grade) %>% 
+  as.data.frame() %>%
+  pivot_wider(names_from = Var2, values_from = Freq) %>%
+  mutate(Major = "All", .after = Var1) %>%
+  mutate(n_students = rowSums(.[3:11])) %>%
   rename(Course = Var1)
 
-prop_class_grade = class_grade %>%
-  mutate(across(c(2:10), .fns = ~./(n_students/100)) %>% #n_students/100 puts value in percentage terms
-           round(2)) %>%
-  #filter(n_students >= 20) %>%
-  arrange(-n_students)
+class_grade_combined = rbind(class_grade_by_major, class_grade_all_majors) %>% arrange(Course)
 
-course_grade_func = function(class, label = F){
+prop_class_grade = class_grade_combined %>%
+  mutate(across(c(3:11), .fns = ~./(n_students/100)) %>% #n_students/100 puts value in percentage terms
+           round(2)) %>%
+  arrange(-n_students) %>% 
+  replace(is.na(.), 0) #%>% if 0 students, it will say 0 students rather than empty plot
+  #filter(n_students != 0) 
+
+course_grade_func = function(class, major, label = F){
 
   class = as.character(class) #accept numeric and character classes
   
-  drop = c("Course", "n_students")
-
   course_df = prop_class_grade %>% 
-    filter(Course == class)
+    filter(Course == class, Major == major) 
 
 #student count
   n_student = course_df$n_students
   
+  drop = c("Course", "n_students", "Major")
+
   course_df_fin = course_df %>%
     select(-drop) %>%
     pivot_longer(everything())
              
   p = ggplot(course_df_fin, aes(x = name, y = value)) +
     geom_col(col = "black", fill = "steelblue") +
-    labs(title = paste("Grade Distribution for",class), x = "Grades", y = "Grade Distribution (%)",
-         subtitle = paste("Number of Students:",n_student))
+    labs(title = paste("Grade Distribution for", class), x = "Grades", y = "Grade Distribution (%)",
+         subtitle = paste("Number of Students:", n_student, "\nMajor:", major))
 
   if(label == T){
     
@@ -547,17 +592,14 @@ course_grade_func = function(class, label = F){
 
   }
   
-  print(p)
+  p
 }
 
-#for loop graph output
-top_n_classes = prop_class_grade[,1] %>% pull(1)
+major_options = class_grade_combined$Major %>% unique() %>% as.character() %>% sort()
 
-for(i in 1:5) {
-  course_grade_func(top_n_classes[i], label = T)
-}
+course_options = class_grade_all_majors %>% filter(n_students > 20) %>% pull(1) %>% sort() %>% as.character() #for course grade distribution
 
-#course_grade_func(36402, label = F) #basic use
+#course_grade_func(36401, major = "All", label = F) #basic use
 ```
 
 ```{r}
@@ -619,6 +661,9 @@ course_performance_by_major_table = function(course_n){
   
   kbl_table
 }
+
+#course_performance_by_major_plot(36315)
+#course_performance_by_major_table(36315)
 ```
 
 
@@ -717,33 +762,208 @@ retake_course_grade_func =  function(class, label = F){
   print(p)
 }
 
-#for loop graph output
-top_n_classes = retake_course_counts[,1] %>% pull(1)
-
-for(i in 1:3) {
-  retake_course_grade_func(top_n_classes[i], label = T)
-}
-
 #retake_course_grade_func(15122, label = F) #basic use
 ```
 
 ```{r}
-#popular electives by major (linpeng)
+#EDA Functions (Emily)
+
+# function to compare grades of 2 classes
+get_course_df <- function(course_num, df) {
+  if (course_num %in% c(36217, 36218, 36219, 36225, 21325, 15259)) {
+    df_course = df[df$course %in% c(36217, 36218, 36219, 36225, 21325, 15259),]
+  }
+  else if (course_num %in% c(36226, 36326)) {
+    df_course = df[df$course %in% c(36226, 36326),]
+  }
+  else if (course_num %in% c(10301, 10401, 10601)) {
+    df_course = df[df$course %in% c(10301, 10401, 10601),]
+  }
+  else if (course_num %in% c(21256, 21259, 21268)) {
+    df_course = df[df$course %in% c(21256, 21259, 21268),]
+  }
+  else if (course_num %in% c(21240, 21241, 21242)) {
+    df_course = df[df$course %in% c(21240, 21241, 21242),]
+  }
+  else if (course_num %in% c(36200, 36201)) {
+    df_course = df[df$course %in% c(36200, 36201),]
+  }
+  else {
+    df_course = df[df$course == course_num,]
+  }
+  return(df_course)
+}
+
+get_letter_grade <- function(df, col_name) {
+  for (i in 1:nrow(df)) {
+    grade = df[i,col_name]
+    if (grade == 1) {
+      df[i,col_name] = "A"
+    }
+    if (grade == 2) {
+      df[i,col_name] = "B"
+    }
+    if (grade == 3) {
+      df[i,col_name] = "C"
+    }
+    if (grade == 4) {
+      df[i,col_name] = "D"
+    }
+    if (grade == 5) {
+      df[i,col_name] = "N"
+    }
+    if (grade == 6) {
+      df[i,col_name] = "O"
+    }
+    if (grade == 7) {
+      df[i,col_name] = "P"
+    }
+    if (grade == 8) {
+      df[i,col_name] = "R"
+    }
+    if (grade == 9) {
+      df[i,col_name] = "W"
+    }
+  }
+  return(df)
+}
+
+df = read.csv("wrangled_data.csv")
+
+compare_grades <- function(course1, course2) {
+  
+  df1 = get_course_df(course1, df)
+  df2 = get_course_df(course2, df)
+  
+  course1_grades = rep(NA, nrow(df2))
+  for (i in 1:nrow(df2)) {
+    s = df2[i,"student"]
+    row1 = df1[df1$student == s,]
+    if (nrow(row1) > 0) {
+      course1_grades[i] = row1[1,"grade"]
+    }
+  }
+
+  df2$course1_grade = course1_grades
+  df2 = df2 %>% drop_na(course1_grade)
+  df2 = get_letter_grade(df2, "course1_grade")
+  
+  xlabel = paste("Grade in", as.character(course1))
+  ylabel = paste("Proportion of Grades in", as.character(course2))
+  leglabel = paste("Grade in", as.character(course2))
+  
+  ggplot(df2, aes(x=course1_grade, fill=grade)) +
+    geom_bar(position="fill") +
+    scale_fill_discrete(name = leglabel) +
+    labs(title = paste("Performance in", as.character(course1), "vs", as.character(course2)), x = xlabel, y = ylabel)
+}
+
+#compare_grades(36315, 36226)
 ```
 
-```{r}
-#contingency tables on performance with class x and class y (Emily)
-```
 
 ```{r}
-#y1 and y2 are classes
-#x is grades
-#faceted by whether they took this pre-req class
-```
+# text for comparing grades of 2 classes
+get_course_df <- function(course_num, df) {
+  if (course_num %in% c(36217, 36218, 36219, 36225, 21325, 15259)) {
+    df_course = df[df$course %in% c(36217, 36218, 36219, 36225, 21325, 15259),]
+  }
+  else if (course_num %in% c(36226, 36326)) {
+    df_course = df[df$course %in% c(36226, 36326),]
+  }
+  else if (course_num %in% c(10301, 10401, 10601)) {
+    df_course = df[df$course %in% c(10301, 10401, 10601),]
+  }
+  else if (course_num %in% c(21256, 21259, 21268)) {
+    df_course = df[df$course %in% c(21256, 21259, 21268),]
+  }
+  else if (course_num %in% c(21240, 21241, 21242)) {
+    df_course = df[df$course %in% c(21240, 21241, 21242),]
+  }
+  else if (course_num %in% c(36200, 36201)) {
+    df_course = df[df$course %in% c(36200, 36201),]
+  }
+  else {
+    df_course = df[df$course == course_num,]
+  }
+  return(df_course)
+}
 
-```{r}
-#Base class EDA on some group (e.g., second year stats courses, 36-3## courses, econ electives, etc.)
+get_letter_grade <- function(df, col_name) {
+  for (i in 1:nrow(df)) {
+    grade = df[i,col_name]
+    if (grade == 1) {
+      df[i,col_name] = "A"
+    }
+    if (grade == 2) {
+      df[i,col_name] = "B"
+    }
+    if (grade == 3) {
+      df[i,col_name] = "C"
+    }
+    if (grade == 4) {
+      df[i,col_name] = "D"
+    }
+    if (grade == 5) {
+      df[i,col_name] = "N"
+    }
+    if (grade == 6) {
+      df[i,col_name] = "O"
+    }
+    if (grade == 7) {
+      df[i,col_name] = "P"
+    }
+    if (grade == 8) {
+      df[i,col_name] = "R"
+    }
+    if (grade == 9) {
+      df[i,col_name] = "W"
+    }
+  }
+  return(df)
+}
 
+df = read.csv("wrangled_data.csv")
+
+compare_grades_text <- function(course1, course2) {
+  
+  df1 = get_course_df(course1, df)
+  df2 = get_course_df(course2, df)
+  
+  course1_grades = rep(NA, nrow(df2))
+  for (i in 1:nrow(df2)) {
+    s = df2[i,"student"]
+    row1 = df1[df1$student == s,]
+    if (nrow(row1) > 0) {
+      course1_grades[i] = row1[1,"grade"]
+    }
+  }
+  
+  df2$course1_grade = course1_grades
+  df2 = df2 %>% drop_na(course1_grade)
+  df2 = get_letter_grade(df2, "course1_grade")
+  
+  prop_table = prop.table(table(df2$course1_grade, df2$grade))
+  
+  hold = NULL
+  for (i in 1:5) {
+    percentage = paste(as.character(round(prop_table[i,i] * 100, digits = 2)), "%", sep = "")
+    letter_grade = " "
+    if (i == 1) {letter_grade = "A"}
+    if (i == 2) {letter_grade = "B"}
+    if (i == 3) {letter_grade = "C"}
+    if (i == 4) {letter_grade = "D"}
+    if (i == 5) {letter_grade = "R"}
+    
+    text = paste(percentage, "of students who get a", letter_grade, "in", as.character(course1), "also get a", letter_grade, "in", as.character(course2))
+    
+    hold[i] = text
+  
+  }
+  hold
+}
+
+#compare_grades_text(36401, 36402) #bug
 ```
 
 ## Model
@@ -796,13 +1016,7 @@ model_df_func = function(response_course, predictor_courses){
 
 }
 
-model_df_func(response_course = 36402, predictor_courses = c(21256, 36225, 36226, 36401)) %>% head()
-
-#model_df_func(response_course = 36401, predictor_courses = c(21240, 36225, 36226)) %>% head()
-
-#model_df_func(response_course = 73374, predictor_courses = c(73274, 73240, 73230)) %>% head()
-
-#model_df_func(response_course = 15351, predictor_courses = c(15122, 15112, 15110)) %>% head()
+#model_df_func(response_course = 36402, predictor_courses = c(21256, 36225, 36226, 36401)) %>% head()
 ```
 
 
@@ -851,67 +1065,14 @@ grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
   grade_ev
 }
 
-grade_dist_plot_func()
-grade_ev_func()
-```
-
-```{r}
-#https://vimeo.com/rstudioinc/review/131218530/212d8a5a7a?#comment_14696574
-#Can potentially add filtering component to shiny app (make input itself reactive based on filtering--> how)
-course_options = prop_class_grade %>% filter(n_students > 100) %>% pull(1) %>% sort() %>% as.character() #for course grade distribution
-```
-
-```{r}
-#Dashboard UI
-header <- dashboardHeader(title = "My Dashboard")
-
-sidebar <- dashboardSidebar(
-  sidebarMenu(
-    menuItem("EDA", tabName = "eda", icon = icon("chart-bar")),
-    menuItem("Predictive Modeling", icon = icon("grain", lib="glyphicon"), tabName = "pred_mod")
-  )
-)
-
-body <- dashboardBody(
-  tabItems(
-    tabItem(tabName = "eda",
-      fluidPage(
-  titlePanel(title = h4("Course EDA", align = "center")),
-  sidebarPanel( 
-    selectInput(inputId = "course_id", label = "Course:", choices = course_options),
-    selectInput(inputId = "label_id", label = "Text Labels:", choices = c(T, F)),
-  mainPanel(plotOutput("plot1"))
-    )
-  )
-    ),
-
-    tabItem(tabName = "pred_mod",
-      fluidPage(
-  titlePanel(title = h4("Grade Prediction", align = "center")),
-  sidebarPanel( 
-    selectInput(inputId = "course_grade_1", label = "21256:", choices = letter_grades_transfer),
-    selectInput(inputId = "course_grade_2", label = "36225:", choices = letter_grades_transfer),
-    selectInput(inputId = "course_grade_3", label = "36226:", choices = letter_grades_transfer),
-    selectInput(inputId = "course_grade_4", label = "36401:", choices = letter_grades_transfer),
-    
-  mainPanel(plotOutput("plot2"),
-            textOutput("text1"),
-    tags$head(tags$style("#text1{color: red;
-                                 font-size: 20px;
-                                 font-style: italic;
-                                 }"
-                         )))))
-    )
-  )
-)
-
-ui = dashboardPage(header, sidebar, body)
+#grade_dist_plot_func()
+#grade_ev_func()
 ```
 
 ```{r}
 #Navbar ui: (https://shiny.rstudio.com/gallery/navbar-example.html)
 ##Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
-##Bugs: image rendering
+##Bugs: image rendering, Emily EDA
 
 top_four_outcome_pred = c(36402, 36401, 73374, 15351) %>% sort() %>% as.character()
 
@@ -983,7 +1144,11 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
             numericInput(inputId = "n_course", label = "Number of Courses:", value = 3, min = 1, max = 10),
             ),
       
-        mainPanel(tableOutput("table1"))))         
+        mainPanel(
+          tableOutput("table1"),
+            tags$head(tags$style("#table1{max-width: 900px
+                                 }"))
+          )))         
              ),     
              
     tabPanel("Course Grade Distribution",
@@ -994,7 +1159,8 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
         
         sidebarLayout(
         sidebarPanel( 
-            selectInput(inputId = "course_id", label = "Course:", choices = course_options),
+            selectInput(inputId = "course_id", label = "Course:", choices = course_options, selected = "36401"),
+            selectInput(inputId = "major_id", label = "Major:", choices = major_options, selected = "All"),
             selectInput(inputId = "label_id", label = "Text Labels:", choices = c(T, F))),
       
         mainPanel(plotOutput("plot2")))
@@ -1012,7 +1178,53 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
             selectInput(inputId = "course_id_by_major", label = "Course:", choices = ev_course_list)),
       
         mainPanel(
-          plotOutput("plot3"),tableOutput("table2")) #issue with table 2 rendering outside of app (shiny.tag.list)
+          plotOutput("plot3"),
+          tableOutput("table2"),
+           tags$head(tags$style("#table2{max-width: 900px;
+                                 margin-top: 20px;
+                                 margin-bottom: 5px
+                                 }"))
+          )
+ 
+    )
+  )),
+  #Emily EDA Function
+      tabPanel("Comparative Course Performance",
+             
+       fluidPage(
+        
+        titlePanel(title = h4("Comparative Course Performance", align = "center")),
+        
+        sidebarLayout(
+        sidebarPanel( 
+            selectInput(inputId = "course_id_comparative_1", label = "Course:", choices = ev_course_list, selected = 36226),
+            selectInput(inputId = "course_id_comparative_2", label = "Course:", choices = ev_course_list, selected = 36225)),
+      
+        mainPanel(
+          plotOutput("plot4"),
+          textOutput("text2_A"), textOutput("text2_B"), textOutput("text2_C"), textOutput("text2_D"), textOutput("text2_R"),
+              tags$head(tags$style("#text2_A{color: black;
+                                 font-size: 20px;
+                                 margin-top: 20px;
+                                 margin-bottom: 5px
+                                 }",
+                                 "#text2_B{color: black;
+                                 font-size: 20px;
+                                 margin-bottom: 5px
+                                 }",
+                                 "#text2_C{color: black;
+                                 font-size: 20px;
+                                 margin-bottom: 5px
+                                 }",
+                                 "#text2_D{color: black;
+                                 font-size: 20px;
+                                 margin-bottom: 5px
+                                 }",
+                                 "#text2_R{color: black;
+                                 font-size: 20px;
+                                 margin-bottom: 5px
+                                 }"
+                         ))) 
  
     )
   ))
@@ -1033,7 +1245,11 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
             numericInput(inputId = "n_retake", label = "Number of Courses:", value = 3, min = 1, max = 10),
             ),
       
-        mainPanel(tableOutput("table3"))))         
+        mainPanel(
+          tableOutput("table3"),
+          tags$head(tags$style("#table3{max-width: 900px
+                                 }"))
+        )))
              ),             
              
     tabPanel("Retake Grade Distribution",
@@ -1048,7 +1264,7 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
             selectInput(inputId = "retake_course_id", label = "Course:", choices = top_four_retake),
             selectInput(inputId = "retake_label_id", label = "Text Labels:", choices = c(T, F))),
       
-        mainPanel(plotOutput("plot4")
+        mainPanel(plotOutput("plot5")
                   )
         )
     )
@@ -1071,22 +1287,37 @@ server = function(input,output){
   #text
   output$text1 <- renderText({paste("Your expected grade is:", grade_ev_func())})
   
+  output$text2_A <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[1]})
+  
+  output$text2_B <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[2]})
+  
+  output$text2_C <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[3]})
+  
+  output$text2_D <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[4]})
+  
+  output$text2_R <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[5]})
+  
   #plots
   output$plot1 <- renderPlot({
-    grade_dist_plot_func()}, height = 400, width = 800)
+    grade_dist_plot_func()
+    }, height = 400, width = 900)
     
   output$plot2 <- renderPlot({
     
-    course_grade_func(input$course_id, label = input$label_id)
-  }, height = 400, width = 800)
+    course_grade_func(class = input$course_id, major = input$major_id, label = input$label_id)
+  }, height = 400, width = 900)
   
   output$plot3 <- renderPlot({
     course_performance_by_major_plot(course_n = input$course_id_by_major)
-  })
+  },  height = 400, width = 900)
   
-   output$plot4 <- renderPlot({
+  output$plot4 <- renderPlot({
+    compare_grades(input$course_id_comparative_1, input$course_id_comparative_2)
+  },  height = 400, width = 900)
+  
+   output$plot5 <- renderPlot({
      retake_course_grade_func(input$retake_course_id, label = input$retake_label_id)
-   },  height = 400, width = 800)
+   },  height = 400, width = 900)
    
 }
 ```
