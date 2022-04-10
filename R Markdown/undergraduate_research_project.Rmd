@@ -28,6 +28,7 @@ library(ggplot2)
 library(shiny)
 library(shinydashboard)
 library(markdown)
+library(scales)
 ```
 
 ```{r}
@@ -768,7 +769,7 @@ retake_course_grade_func =  function(class, label = F){
 ```{r}
 #EDA Functions (Emily)
 
-# function to compare grades of 2 classes
+# graph function to compare grades of 2 classes
 get_course_df <- function(course_num, df) {
   if (course_num %in% c(36217, 36218, 36219, 36225, 21325, 15259)) {
     df_course = df[df$course %in% c(36217, 36218, 36219, 36225, 21325, 15259),]
@@ -794,46 +795,77 @@ get_course_df <- function(course_num, df) {
   return(df_course)
 }
 
-get_letter_grade <- function(df, col_name) {
-  for (i in 1:nrow(df)) {
-    grade = df[i,col_name]
-    if (grade == 1) {
-      df[i,col_name] = "A"
+get_students <- function(df1, df2) {
+  df1$student = as.character(df1$student)
+  df2$student = as.character(df2$student)
+  students1 = df1$student
+  students2 = df2$student
+  students = intersect(students1, students2)
+  return(students)
+}
+
+is_after <- function(sem1, sem2) {
+  year1 = substr(sem1, 2, 3)
+  s1 = substr(sem1, 1, 1)
+  year2 = substr(sem2, 2, 3)
+  s2 = substr(sem2, 1, 1)
+  if (year1 > year2) {
+    return(TRUE)
+  }
+  if (year1 < year2) {
+    return(FALSE)
+  }
+  if (s1 == "S") {
+    return(FALSE)
+  }
+  if (s2 == "S") {
+    return(TRUE)
+  }
+  if (s1 == "F") {
+    return(TRUE)
+  }
+  if (s2 == "F") {
+    return(FALSE)
+  }
+  if (s1 == "M") { # s2 is N
+    return(FALSE)
+  }
+  return(TRUE) # s1 is N, s2 is M
+}
+
+get_last_semester <- function(df) {
+  semesters = df$semester
+  last_semester = semesters[1]
+  for (i in 2:length(semesters)) {
+    sem = semesters[i]
+    if (is_after(sem, last_semester) == TRUE) {
+      last_semester = sem
     }
-    if (grade == 2) {
-      df[i,col_name] = "B"
-    }
-    if (grade == 3) {
-      df[i,col_name] = "C"
-    }
-    if (grade == 4) {
-      df[i,col_name] = "D"
-    }
-    if (grade == 5) {
-      df[i,col_name] = "N"
-    }
-    if (grade == 6) {
-      df[i,col_name] = "O"
-    }
-    if (grade == 7) {
-      df[i,col_name] = "P"
-    }
-    if (grade == 8) {
-      df[i,col_name] = "R"
-    }
-    if (grade == 9) {
-      df[i,col_name] = "W"
+  }
+  return(last_semester)
+}
+
+remove_repeats <- function(df) {
+  students = get_students(df, df)
+  for (i in 1:length(students)) {
+    s = students[i]
+    rows = df[df["student"] == s, ]
+    if (nrow(rows) > 1) {
+      last_semester = get_last_semester(rows)
+      df = df[!(df["student"] == s & df["semester"] != last_semester), ]
     }
   }
   return(df)
 }
 
-df = read.csv("wrangled_data.csv")
-
-compare_grades <- function(course1, course2) {
+compare_grades_plot <- function(course1, course2) {
+  df = read.csv("wrangled_data.csv")
+  df$grade = as.character(df$grade)
   
   df1 = get_course_df(course1, df)
+  df1 = remove_repeats(df1)
   df2 = get_course_df(course2, df)
+  df2 = remove_repeats(df2)
   
   course1_grades = rep(NA, nrow(df2))
   for (i in 1:nrow(df2)) {
@@ -846,7 +878,7 @@ compare_grades <- function(course1, course2) {
 
   df2$course1_grade = course1_grades
   df2 = df2 %>% drop_na(course1_grade)
-  df2 = get_letter_grade(df2, "course1_grade")
+  # df2 = get_letter_grade(df2, "course1_grade")
   
   xlabel = paste("Grade in", as.character(course1))
   ylabel = paste("Proportion of Grades in", as.character(course2))
@@ -854,15 +886,17 @@ compare_grades <- function(course1, course2) {
   
   ggplot(df2, aes(x=course1_grade, fill=grade)) +
     geom_bar(position="fill") +
-    scale_fill_discrete(name = leglabel) +
-    labs(title = paste("Performance in", as.character(course1), "vs", as.character(course2)), x = xlabel, y = ylabel)
+    xlab(xlabel) +
+    ylab(ylabel) +
+    scale_fill_discrete(name = leglabel)
 }
 
-#compare_grades(36315, 36226)
+#compare_grades_plot(36226, 36226)
 ```
 
-
 ```{r}
+#text output function
+
 # text for comparing grades of 2 classes
 get_course_df <- function(course_num, df) {
   if (course_num %in% c(36217, 36218, 36219, 36225, 21325, 15259)) {
@@ -889,46 +923,77 @@ get_course_df <- function(course_num, df) {
   return(df_course)
 }
 
-get_letter_grade <- function(df, col_name) {
-  for (i in 1:nrow(df)) {
-    grade = df[i,col_name]
-    if (grade == 1) {
-      df[i,col_name] = "A"
+get_students <- function(df1, df2) {
+  df1$student = as.character(df1$student)
+  df2$student = as.character(df2$student)
+  students1 = df1$student
+  students2 = df2$student
+  students = intersect(students1, students2)
+  return(students)
+}
+
+is_after <- function(sem1, sem2) {
+  year1 = substr(sem1, 2, 3)
+  s1 = substr(sem1, 1, 1)
+  year2 = substr(sem2, 2, 3)
+  s2 = substr(sem2, 1, 1)
+  if (year1 > year2) {
+    return(TRUE)
+  }
+  if (year1 < year2) {
+    return(FALSE)
+  }
+  if (s1 == "S") {
+    return(FALSE)
+  }
+  if (s2 == "S") {
+    return(TRUE)
+  }
+  if (s1 == "F") {
+    return(TRUE)
+  }
+  if (s2 == "F") {
+    return(FALSE)
+  }
+  if (s1 == "M") { # s2 is N
+    return(FALSE)
+  }
+  return(TRUE) # s1 is N, s2 is M
+}
+
+get_last_semester <- function(df) {
+  semesters = df$semester
+  last_semester = semesters[1]
+  for (i in 2:length(semesters)) {
+    sem = semesters[i]
+    if (is_after(sem, last_semester) == TRUE) {
+      last_semester = sem
     }
-    if (grade == 2) {
-      df[i,col_name] = "B"
-    }
-    if (grade == 3) {
-      df[i,col_name] = "C"
-    }
-    if (grade == 4) {
-      df[i,col_name] = "D"
-    }
-    if (grade == 5) {
-      df[i,col_name] = "N"
-    }
-    if (grade == 6) {
-      df[i,col_name] = "O"
-    }
-    if (grade == 7) {
-      df[i,col_name] = "P"
-    }
-    if (grade == 8) {
-      df[i,col_name] = "R"
-    }
-    if (grade == 9) {
-      df[i,col_name] = "W"
+  }
+  return(last_semester)
+}
+
+remove_repeats <- function(df) {
+  students = get_students(df, df)
+  for (i in 1:length(students)) {
+    s = students[i]
+    rows = df[df["student"] == s, ]
+    if (nrow(rows) > 1) {
+      last_semester = get_last_semester(rows)
+      df = df[!(df["student"] == s & df["semester"] != last_semester), ]
     }
   }
   return(df)
 }
 
-df = read.csv("wrangled_data.csv")
-
 compare_grades_text <- function(course1, course2) {
+  df = read.csv("wrangled_data.csv")
+  df$grade = as.character(df$grade)
   
   df1 = get_course_df(course1, df)
+  df1 = remove_repeats(df1)
   df2 = get_course_df(course2, df)
+  df2 = remove_repeats(df2)
   
   course1_grades = rep(NA, nrow(df2))
   for (i in 1:nrow(df2)) {
@@ -941,29 +1006,87 @@ compare_grades_text <- function(course1, course2) {
   
   df2$course1_grade = course1_grades
   df2 = df2 %>% drop_na(course1_grade)
-  df2 = get_letter_grade(df2, "course1_grade")
   
-  prop_table = prop.table(table(df2$course1_grade, df2$grade))
-  
-  hold = NULL
+  text = rep(" ", 5)
+  grades = c("A", "B", "C", "D", "R")
   for (i in 1:5) {
-    percentage = paste(as.character(round(prop_table[i,i] * 100, digits = 2)), "%", sep = "")
-    letter_grade = " "
-    if (i == 1) {letter_grade = "A"}
-    if (i == 2) {letter_grade = "B"}
-    if (i == 3) {letter_grade = "C"}
-    if (i == 4) {letter_grade = "D"}
-    if (i == 5) {letter_grade = "R"}
-    
-    text = paste(percentage, "of students who get a", letter_grade, "in", as.character(course1), "also get a", letter_grade, "in", as.character(course2))
-    
-    hold[i] = text
-  
+    grade_df = df2[df2["course1_grade"] == grades[i], ]
+    denom = nrow(grade_df)
+    num = nrow(grade_df[grade_df["grade"] == grades[i], ])
+    if (denom == 0) {
+      text[i] = paste("No students got a", grades[i], "in", as.character(course1))
+    }
+    else {
+      percent = round((num / denom) * 100, 2)
+      text[i] = paste(as.character(percent), "% of students who got a ", grades[i], " in ", 
+                      as.character(course1), " also got a ", grades[i], " in ", 
+                      as.character(course2), sep = "")
+    }
   }
-  hold
+  text
 }
 
-#compare_grades_text(36401, 36402) #bug
+#compare_grades_text(36225, 36226)
+```
+
+```{r}
+#EDA Functions (Linpeng)
+
+stat_df <- read.csv("wrangled_data.csv")
+
+#comparing performance in 36-3xx/4xx course across different majors
+#input course/elective 
+classify_elective <- function(df) {
+  
+  result <- df %>% mutate(electiveNum = case_when((df$course >= 36300) & (df$course < 36400) ~ "36300 Electives",
+                                                  (df$course >= 36400) & (df$course < 36500) ~ "36400 Electives",
+                                                  TRUE ~ "Elective"))
+  return(result)
+}
+
+# Function takes in courseType and courseRange, and outputs the graph that shows
+# students performance through a stacked bar graph
+
+compare_groups <- function(courseType, courseRange) {
+  
+  standardGrade = c("A", "B", "C", "D", "R")
+
+  result = stat_df %>%
+    filter(grade %in% standardGrade, 
+           course >= 36000 & course <= 36999) %>%
+    classify_elective()
+  
+  if (courseType == "Core") {
+    result <- subset(result, core == 1)
+  }
+  if (courseType == "Elective") {
+    result <- subset(result, elective == 1)
+  }
+  if (courseRange == "362xx") {
+    result <- subset(result, course >= 36200 & course < 36300)
+  }
+  if (courseRange == "363xx") {
+    result <- subset(result, course >= 36300 & course < 36400)
+  }
+  if (courseRange == "364xx") {
+    result <- subset(result, course >= 36400 & course < 36500)
+  }
+  
+  performance <- result %>%
+    add_count(major) %>%
+    add_count(major, grade) %>%
+    ggplot(aes(x = major, y = nn / n, fill = grade)) +
+    geom_bar(stat = "identity", position = "dodge", col = "black") +
+    scale_y_continuous(labels = scales::percent) +
+    labs(title = paste(courseType, courseRange, "Performance by Major"), 
+         x = "Major", y = "Frequency", fill = "Grade")
+  
+  performance
+}
+
+course_type = c("Core", "Elective")
+
+course_range = c("362xx", "363xx", "364xx")
 ```
 
 ## Model
@@ -980,14 +1103,14 @@ values: id # ,    major, grade, grade, grade, grade, qpa #
 
 ```{r}
 model_df_func = function(response_course, predictor_courses){
-
+  
   filtered_courses = c(response_course, predictor_courses)
                      
   long_df = df_2 %>% #Note that the base df here is df_2. This may change in the future as we add more transfer credit courses
     group_by(student) %>%
     filter(all(filtered_courses %in% course)) %>% #only take students if they have all of filtered courses
     filter(course %in% filtered_courses & grade %in% letter_grades) %>% #filter to the filtered courses with letter grades
-    select(student, major, course, grade, semester, QPA)
+    select(student, major, course, grade, semester, updating_total_QPA)
 
 #Retains students with retakes by taking their latest course performance
   retake_remedy = long_df %>%
@@ -1016,9 +1139,25 @@ model_df_func = function(response_course, predictor_courses){
 
 }
 
-#model_df_func(response_course = 36402, predictor_courses = c(21256, 36225, 36226, 36401)) %>% head()
-```
+test_sample_size = function(resp_course, pred_course) {
+  
+model_df_func(response_course = resp_course, predictor_courses = pred_course) %>% nrow()
+  
+}
 
+# test_sample_size(36402, c(21256, 36225, 36226, 36401))
+# 
+# test_sample_size(36401, c(21256, 36225, 36226))
+# 
+# test_sample_size(36226, c(21256, 36225, 36202)) #can take 36202 out (discretion depending on model accuracy)
+# 
+# test_sample_size(36225, c(21256, 36202))
+# 
+# test_sample_size(15122, c(15112, 21127)) #can add 36225 but these other two courses seemed more meaningful for predicting 15122
+# 
+# test_sample_size(36350, c(36225, 36226))
+```
+## FIND RESPONSE PREDICTOR COMBOS W GOOD  SAMPLE SIZES
 
 ## Shiny App
 
@@ -1072,6 +1211,7 @@ grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
 ```{r}
 #Navbar ui: (https://shiny.rstudio.com/gallery/navbar-example.html)
 ##Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
+##Shiny Themes: (https://rstudio.github.io/shinythemes/)
 ##Bugs: image rendering, Emily EDA
 
 top_four_outcome_pred = c(36402, 36401, 73374, 15351) %>% sort() %>% as.character()
@@ -1227,8 +1367,23 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
                          ))) 
  
     )
-  ))
+  )),
   
+  #Linpeng EDA
+    tabPanel("Course Range Grade Distribution by Major", #need better title
+             
+       fluidPage(
+        
+        titlePanel(title = h4("Course Range Grade Distribution by Major", align = "center")),
+        
+        sidebarLayout(
+        sidebarPanel( 
+            selectInput(inputId = "course_type_id", label = "Course Type:", choices = course_type, selected = "Core"),
+            selectInput(inputId = "course_range_id", label = "Course Range:", choices = course_range, selected = "362xx")),
+      
+        mainPanel(plotOutput("plot5")))
+    )
+  )
   ),
 
   
@@ -1264,7 +1419,7 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
             selectInput(inputId = "retake_course_id", label = "Course:", choices = top_four_retake),
             selectInput(inputId = "retake_label_id", label = "Text Labels:", choices = c(T, F))),
       
-        mainPanel(plotOutput("plot5")
+        mainPanel(plotOutput("plot6")
                   )
         )
     )
@@ -1312,10 +1467,14 @@ server = function(input,output){
   },  height = 400, width = 900)
   
   output$plot4 <- renderPlot({
-    compare_grades(input$course_id_comparative_1, input$course_id_comparative_2)
+    compare_grades_plot(input$course_id_comparative_1, input$course_id_comparative_2)
   },  height = 400, width = 900)
   
-   output$plot5 <- renderPlot({
+  output$plot5 <- renderPlot({
+     compare_groups(input$course_type_id, input$course_range_id)
+   },  height = 400, width = 900)
+  
+   output$plot6 <- renderPlot({
      retake_course_grade_func(input$retake_course_id, label = input$retake_label_id)
    },  height = 400, width = 900)
    
