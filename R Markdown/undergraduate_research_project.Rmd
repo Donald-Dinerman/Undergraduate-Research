@@ -1214,7 +1214,7 @@ grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
 ##Shiny Themes: (https://rstudio.github.io/shinythemes/)
 ##Bugs: image rendering, Emily EDA
 
-top_four_outcome_pred = c(36402, 36401, 73374, 15351) %>% sort() %>% as.character()
+top_four_outcome_pred = c(36402, 36401, 73374, 15351)
 
 top_four_retake = first_leg %>% head(4) %>% pull(1)
 
@@ -1230,36 +1230,71 @@ ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", de
                
              sidebarPanel( 
                 selectInput(inputId = "course_outcome_1", label = "Predict this course:", choices = top_four_outcome_pred), #choices x is a placeholder 
-                numericInput(inputId = "gpa", label = "Major GPA:", value = 3, min = 0, max = 4, step = 0.01),
              
              conditionalPanel(
                condition = "input.course_outcome_1 == '36402'",
-                selectInput(inputId = "course_grade_1", label = "21256:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_2", label = "36225:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_3", label = "36226:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_4", label = "36401:", choices = letter_grades_transfer)
+               
+                selectInput(inputId = "class_id", label = "Class:", choices = as.character(1:5)),
+                selectInput(inputId = "major", label = "Major:", choices = major_options[-1]),
+               
+                selectInput(inputId = "course_grade_1", label = "73230:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_2", label = "73240:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_3", label = "73274:", choices = letter_grades_transfer),
+                              
+                numericInput(inputId = "units_carried", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
+               
+                numericInput(inputId = "gpa", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
+                numericInput(inputId = "gpa", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
              ),
              
              conditionalPanel(
                condition = "input.course_outcome_1 == '36401'",
-                selectInput(inputId = "course_grade_1", label = "21240:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_2", label = "36225:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_3", label = "36226:", choices = letter_grades_transfer)
+               
+                selectInput(inputId = "class_id", label = "Class:", choices = as.character(1:5)),
+                selectInput(inputId = "major", label = "Major:", choices = major_options[-1]),
+               
+                selectInput(inputId = "course_grade_1", label = "73230:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_2", label = "73240:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_3", label = "73274:", choices = letter_grades_transfer),
+                              
+                numericInput(inputId = "units_carried", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
+               
+                numericInput(inputId = "gpa", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
+                numericInput(inputId = "gpa", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
              ), 
              
              conditionalPanel(
                condition = "input.course_outcome_1 == '73374'",
+               
+                selectInput(inputId = "class_id", label = "Class:", choices = as.character(1:5)),
+                selectInput(inputId = "major", label = "Major:", choices = major_options[-1]),
+               
                 selectInput(inputId = "course_grade_1", label = "73230:", choices = letter_grades_transfer),
                 selectInput(inputId = "course_grade_2", label = "73240:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_3", label = "73274:", choices = letter_grades_transfer)
+                selectInput(inputId = "course_grade_3", label = "73274:", choices = letter_grades_transfer),
+                              
+                numericInput(inputId = "units_carried", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
+               
+                numericInput(inputId = "gpa", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
+                numericInput(inputId = "gpa", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
              ),
              
              conditionalPanel(
                condition = "input.course_outcome_1 == '15351'",
-                selectInput(inputId = "course_grade_1", label = "15110:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_2", label = "15112:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_3", label = "15122:", choices = letter_grades_transfer)
-             ),             
+               
+                selectInput(inputId = "class_id", label = "Class:", choices = as.character(1:5)),
+                selectInput(inputId = "major", label = "Major:", choices = major_options[-1]),
+               
+                selectInput(inputId = "course_grade_1", label = "73230:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_2", label = "73240:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_3", label = "73274:", choices = letter_grades_transfer),
+                              
+                numericInput(inputId = "units_carried", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
+               
+                numericInput(inputId = "gpa", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
+                numericInput(inputId = "gpa", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
+             ),
+             submitButton(text = "Predict", icon = NULL, width = NULL)
             ),
     
   mainPanel(plotOutput("plot1"),
