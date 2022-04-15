@@ -452,7 +452,7 @@ df_2 = df %>%
   add_prereq(., 15112, major_in = "STAMACH") %>% 
   unify_course_names(., c(10401, 10601), 10301)
 
-df_2 %>% head()
+#df_2 %>% head()
 
 #matrices_df <- filter(df_2, course %in% c(21240,21241,21242))
 #nrow(matrices_df %>% filter(grade == "T")) / nrow(matrices_df)
@@ -478,9 +478,9 @@ percentage_course_df = as.data.frame(prop_tab * 100) %>% arrange(-Freq)
 
 colnames(percentage_course_df) = c("Course", "% of Students")
 
-head(percentage_course_df, 5)  %>% 
-  kbl(caption = "Table 1: Top 5 Courses Taken", booktabs = T) %>% 
-  kable_paper("hover", full_width = T)
+#head(percentage_course_df, 5)  %>% 
+#  kbl(caption = "Table 1: Top 5 Courses Taken", booktabs = T) %>% 
+#  kable_paper("hover", full_width = T)
 ```
 
 ```{r}
@@ -1215,12 +1215,13 @@ grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
 #Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
 #Shiny Themes: (https://rstudio.github.io/shinythemes/)
 #Bugs: image rendering
+#title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", deleteFile = F), "Stat and DS Advising"), #add image (bug: not locating image file)
 
 top_four_outcome_pred = c(36402, 36401, 73374, 15351)
 
 top_four_retake = first_leg %>% head(4) %>% pull(1)
 
-ui =  navbarPage(title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", deleteFile = F), "Stat and DS Advising"), #add image (bug: not locating image file)
+ui =  navbarPage(title = "Stat and DS Advising",
                 
       tabPanel("Predictive Modeling",
       
@@ -1479,16 +1480,40 @@ server = function(input,output){
   output$table3 <- renderText({top_n_retake_tab(n_retake = input$n_retake)})
 
   #text
-  
+
   ##For the modeling output, 
-  ##(1) I can make calls to the model function in this statement with the unique inputs within the model function.
-  ##(2) Store the reactive output to take an EV grade and construct a ggplot bar chart of grade probabilities
+  ##(1) Calls to unique inputs in ifelse statements to store reactive output
+  ##(2) Place output in predictive model function to take an EV grade and construct a ggplot bar chart of grade probabilities
   
   x_value = reactive(
-    if(input$course_outcome == "36402"){input$major_1} else
-                      if(input$course_outcome == "36401"){input$major_2} else
-                        if(input$course_outcome == "73374"){input$major_3} else
-                          if(input$course_outcome == "15351"){input$major_4}
+    
+    if(input$course_outcome == "36402"){
+      
+      c(input$course_outcome, input$class_id_1, input$major_1, input$course_grade_1_1, input$course_grade_1_2, input$course_grade_1_3, 
+        input$units_carried_1, input$cum_gpa_1, input$major_gpa_1)
+      
+      } else
+          
+    if(input$course_outcome == "36401"){
+          
+      c(input$course_outcome, input$class_id_2, input$major_2, input$course_grade_2_1, input$course_grade_2_2, input$course_grade_2_3,
+        input$units_carried_2, input$cum_gpa_2, input$major_gpa_2)
+          
+      } else
+                        
+    if(input$course_outcome == "73374"){
+                          
+      c(input$course_outcome, input$class_id_3, input$major_3, input$course_grade_3_1, input$course_grade_3_2, input$course_grade_3_3, 
+        input$units_carried_3,input$cum_gpa_3, input$major_gpa_3)
+              
+      } else
+                          
+    if(input$course_outcome == "15351"){
+        
+      c(input$course_outcome, input$class_id_4, input$major_4, input$course_grade_4_1, input$course_grade_4_2, input$course_grade_4_3, 
+        input$units_carried_4, input$cum_gpa_4, input$major_gpa_4)
+        
+      }
   )
   
   output$text123 <- eventReactive(input$go, {paste(x_value())}) #the (), in x_value(), allows you to get the value of the reactive element
