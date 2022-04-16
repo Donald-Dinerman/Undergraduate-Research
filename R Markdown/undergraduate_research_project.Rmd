@@ -27,6 +27,7 @@ library(stringr)
 library(ggplot2)
 library(shiny)
 library(shinydashboard)
+library(shinyBS)
 library(markdown)
 library(scales)
 ```
@@ -1214,14 +1215,17 @@ grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
 #Navbar ui: (https://shiny.rstudio.com/gallery/navbar-example.html)
 #Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
 #Shiny Themes: (https://rstudio.github.io/shinythemes/)
-#Bugs: image rendering
-#title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", deleteFile = F), "Stat and DS Advising"), #add image (bug: not locating image file)
+#Bugs: not locating local image file, major tooltip not working
+#Image workaround: Use image url location instead of local
+#Find image test: title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", deleteFile = F), "Stat and DS Advising")
 
 top_four_outcome_pred = c(36402, 36401, 73374, 15351)
 
 top_four_retake = first_leg %>% head(4) %>% pull(1)
 
-ui =  navbarPage(title = "Stat and DS Advising",
+ui =  navbarPage(title = div(img(
+  
+  src = "https://www.stat.cmu.edu/wids/logo/cmu-stat.png", height = 30, width = 150), ""),
                 
       tabPanel("Predictive Modeling",
       
@@ -1229,10 +1233,10 @@ ui =  navbarPage(title = "Stat and DS Advising",
             
              titlePanel(title = h4("Grade Prediction", align = "center")),
               
-             sidebarLayout( 
+             sidebarLayout(
                
              sidebarPanel( 
-                selectInput(inputId = "course_outcome", label = "Predict this course:", choices = top_four_outcome_pred), #choices x is a placeholder 
+                selectInput(inputId = "course_outcome", label = "Predict Course:", choices = top_four_outcome_pred), #choices x is a placeholder 
              
              conditionalPanel(
                condition = "input.course_outcome == '36402'",
@@ -1298,12 +1302,58 @@ ui =  navbarPage(title = "Stat and DS Advising",
                 numericInput(inputId = "major_gpa_4", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
              ),
              
-             actionButton(inputId = "go", label = "Predict")
-            ),
+             actionButton(inputId = "go", label = "Predict"),
+             
+             #Tool Tip (Help Documentation): have to escape apostrophe (\\), otherwise causes parsing error in js code
+             
+             bsTooltip(id = "course_outcome", title = "Predict This Course"),
+             
+             bsTooltip(id = "class_id_1", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
+             bsTooltip(id = "class_id_2", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
+             bsTooltip(id = "class_id_3", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
+             bsTooltip(id = "class_id_4", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
+
+             bsTooltip(id = "major_1", title = "Input Student\\'s Major"),
+             bsTooltip(id = "major_2", title = "Input Student\\'s Major"),
+             bsTooltip(id = "major_3", title = "Input Student\\'s Major"),
+             bsTooltip(id = "major_4", title = "Input Student\\'s Major"),
+             
+             bsTooltip(id = "units_carried_1", title = "Input Units Carried During Semester of Predicted Course"),
+             bsTooltip(id = "units_carried_2", title = "Input Units Carried During Semester of Predicted Course"),
+             bsTooltip(id = "units_carried_3", title = "Input Units Carried During Semester of Predicted Course"),
+             bsTooltip(id = "units_carried_4", title = "Input Units Carried During Semester of Predicted Course"),
+             
+             bsTooltip(id = "cum_gpa_1", title = "Input Cumulative GPA (Find on SIO)"),
+             bsTooltip(id = "cum_gpa_2", title = "Input Cumulative GPA (Find on SIO)"),
+             bsTooltip(id = "cum_gpa_3", title = "Input Cumulative GPA (Find on SIO)"),
+             bsTooltip(id = "cum_gpa_4", title = "Input Cumulative GPA (Find on SIO)"),
+             
+             bsTooltip(id = "major_gpa_1", title = "Input Major GPA (Find on Stellic)"),
+             bsTooltip(id = "major_gpa_2", title = "Input Major GPA (Find on Stellic)"),
+             bsTooltip(id = "major_gpa_3", title = "Input Major GPA (Find on Stellic)"),
+             bsTooltip(id = "major_gpa_4", title = "Input Major GPA (Find on Stellic)"),
+             
+             bsTooltip(id = "course_grade_1_1", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_1_2", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_1_3", title = "Input Course Grade"),
+             
+             bsTooltip(id = "course_grade_2_1", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_2_2", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_2_3", title = "Input Course Grade"),
+             
+             bsTooltip(id = "course_grade_3_1", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_3_2", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_3_3", title = "Input Course Grade"),
+             
+             bsTooltip(id = "course_grade_4_1", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_4_2", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_4_3", title = "Input Course Grade"),
+             
+             bsTooltip(id = "go", title = "Run Prediction")
+            ),                         
     
   mainPanel(plotOutput("plot1"),
             textOutput("text123"), #test for action button
-            textOutput("text1"),
     tags$head(tags$style("#text1{color: black;
                                  font-size: 20px;
                                  font-style: italic;
