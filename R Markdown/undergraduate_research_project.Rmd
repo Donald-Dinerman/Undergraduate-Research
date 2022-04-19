@@ -33,9 +33,6 @@ library(scales)
 ```
 
 ```{r}
-#main data set
-stat_df = read.csv("stats_data.csv")
-
 #updated data set
 stat_df = read.csv("stats_data_updated.csv")
 ```
@@ -885,14 +882,14 @@ compare_grades_plot <- function(course1, course2) {
   ylabel = paste("Proportion of Grades in", as.character(course2))
   leglabel = paste("Grade in", as.character(course2))
   
-  ggplot(df2, aes(x=course1_grade, fill=grade)) +
-    geom_bar(position="fill") +
+  ggplot(df2, aes(x=course1_grade, fill = grade)) +
+    geom_bar(position = "fill", col =  "black") +
     xlab(xlabel) +
     ylab(ylabel) +
     scale_fill_discrete(name = leglabel)
 }
 
-#compare_grades_plot(36226, 36226)
+compare_grades_plot(36225, 36225)
 ```
 
 ```{r}
@@ -1029,7 +1026,7 @@ compare_grades_text <- function(course1, course2) {
   text
 }
 
-#compare_grades_text(36315, 36315)
+#compare_grades_text(36315, 36226)
 ```
 
 ```{r}
@@ -1236,7 +1233,7 @@ ui =  navbarPage(title = div(img(
              sidebarLayout(
                
              sidebarPanel( 
-                selectInput(inputId = "course_outcome", label = "Predict Course:", choices = top_four_outcome_pred), #choices x is a placeholder 
+                selectInput(inputId = "course_outcome", label = "Predict Course:", choices = top_four_outcome_pred), 
              
              conditionalPanel(
                condition = "input.course_outcome == '36402'",
@@ -1534,38 +1531,40 @@ server = function(input,output){
   ##For the modeling output, 
   ##(1) Calls to unique inputs in ifelse statements to store reactive output
   ##(2) Place output in predictive model function to take an EV grade and construct a ggplot bar chart of grade probabilities
+  ##(3) Make this output some object and connect it to the predict button (create all the output behind the scenes and then just show it when the predict button is clicked)
   
   x_value = reactive(
     
     if(input$course_outcome == "36402"){
       
-      c(input$course_outcome, input$class_id_1, input$major_1, input$course_grade_1_1, input$course_grade_1_2, input$course_grade_1_3, 
-        input$units_carried_1, input$cum_gpa_1, input$major_gpa_1)
+      c(input$class_id_1, input$major_1, input$course_grade_1_1, input$course_grade_1_2, input$course_grade_1_3, input$units_carried_1,
+        input$cum_gpa_1, input$major_gpa_1)
       
       } else
           
     if(input$course_outcome == "36401"){
           
-      c(input$course_outcome, input$class_id_2, input$major_2, input$course_grade_2_1, input$course_grade_2_2, input$course_grade_2_3,
-        input$units_carried_2, input$cum_gpa_2, input$major_gpa_2)
+      c(input$class_id_2, input$major_2, input$course_grade_2_1, input$course_grade_2_2, input$course_grade_2_3, input$units_carried_2,
+        input$cum_gpa_2, input$major_gpa_2)
           
       } else
                         
     if(input$course_outcome == "73374"){
                           
-      c(input$course_outcome, input$class_id_3, input$major_3, input$course_grade_3_1, input$course_grade_3_2, input$course_grade_3_3, 
-        input$units_carried_3,input$cum_gpa_3, input$major_gpa_3)
+      c(input$class_id_3, input$major_3, input$course_grade_3_1, input$course_grade_3_2, input$course_grade_3_3, input$units_carried_3, 
+        input$cum_gpa_3, input$major_gpa_3)
               
       } else
                           
     if(input$course_outcome == "15351"){
         
-      c(input$course_outcome, input$class_id_4, input$major_4, input$course_grade_4_1, input$course_grade_4_2, input$course_grade_4_3, 
-        input$units_carried_4, input$cum_gpa_4, input$major_gpa_4)
+      c(input$class_id_4, input$major_4, input$course_grade_4_1, input$course_grade_4_2, input$course_grade_4_3, input$units_carried_4,
+        input$cum_gpa_4, input$major_gpa_4)
         
       }
   )
   
+  #predict(input$course_outcome, x_value()) #put y_value in first argument
   output$text123 <- eventReactive(input$go, {paste(x_value())}) #the (), in x_value(), allows you to get the value of the reactive element
     
   output$text1 <- renderText({paste("Your expected grade is:", grade_ev_func())})
