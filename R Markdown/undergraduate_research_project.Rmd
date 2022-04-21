@@ -889,7 +889,7 @@ compare_grades_plot <- function(course1, course2) {
     scale_fill_discrete(name = leglabel)
 }
 
-compare_grades_plot(36225, 36225)
+#compare_grades_plot(36225, 36225)
 ```
 
 ```{r}
@@ -1212,11 +1212,12 @@ grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
 #Navbar ui: (https://shiny.rstudio.com/gallery/navbar-example.html)
 #Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
 #Shiny Themes: (https://rstudio.github.io/shinythemes/)
+#Shiny Tutorial: (https://shiny.rstudio.com/tutorial/written-tutorial/lesson1/)
 #Bugs: not locating local image file, major tooltip not working
 #Image workaround: Use image url location instead of local
 #Find image test: title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", deleteFile = F), "Stat and DS Advising")
 
-top_four_outcome_pred = c(36402, 36401, 73374, 15351)
+top_four_outcome_pred = c(15122, 15351, 36225, 36226, 36401, 36402)
 
 top_four_retake = first_leg %>% head(4) %>% pull(1)
 
@@ -1236,15 +1237,14 @@ ui =  navbarPage(title = div(img(
                 selectInput(inputId = "course_outcome", label = "Predict Course:", choices = top_four_outcome_pred), 
              
              conditionalPanel(
-               condition = "input.course_outcome == '36402'",
+               condition = "input.course_outcome == '15122'",
                
                 selectInput(inputId = "class_id_1", label = "Class:", choices = as.character(1:5)),
                 selectInput(inputId = "major_1", label = "Major:", choices = major_options[-1]),
                
-                selectInput(inputId = "course_grade_1_1", label = "73230:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_1_2", label = "73240:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_1_3", label = "73274:", choices = letter_grades_transfer),
-                              
+                selectInput(inputId = "course_grade_1_1", label = "15112:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_1_2", label = "21127:", choices = letter_grades_transfer),
+
                 numericInput(inputId = "units_carried_1", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
                
                 numericInput(inputId = "cum_gpa_1", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
@@ -1252,15 +1252,14 @@ ui =  navbarPage(title = div(img(
              ),
              
              conditionalPanel(
-               condition = "input.course_outcome == '36401'",
+               condition = "input.course_outcome == '15351'",
                
                 selectInput(inputId = "class_id_2", label = "Class:", choices = as.character(1:5)),
                 selectInput(inputId = "major_2", label = "Major:", choices = major_options[-1]),
                
-                selectInput(inputId = "course_grade_2_1", label = "73230:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_2_2", label = "73240:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_2_3", label = "73274:", choices = letter_grades_transfer),
-                              
+                selectInput(inputId = "course_grade_2_1", label = "15122:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_2_2", label = "21127:", choices = letter_grades_transfer),
+
                 numericInput(inputId = "units_carried_2", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
                
                 numericInput(inputId = "cum_gpa_2", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
@@ -1268,14 +1267,14 @@ ui =  navbarPage(title = div(img(
              ), 
              
              conditionalPanel(
-               condition = "input.course_outcome == '73374'",
+               condition = "input.course_outcome == '36225'",
                
                 selectInput(inputId = "class_id_3", label = "Class:", choices = as.character(1:5)),
                 selectInput(inputId = "major_3", label = "Major:", choices = major_options[-1]),
                
-                selectInput(inputId = "course_grade_3_1", label = "73230:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_3_2", label = "73240:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_3_3", label = "73274:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_3_1", label = "21120:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_3_2", label = "21241:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_3_3", label = "21256:", choices = letter_grades_transfer),
                               
                 numericInput(inputId = "units_carried_3", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
                
@@ -1284,19 +1283,51 @@ ui =  navbarPage(title = div(img(
              ),
              
              conditionalPanel(
-               condition = "input.course_outcome == '15351'",
+               condition = "input.course_outcome == '36226'",
                
                 selectInput(inputId = "class_id_4", label = "Class:", choices = as.character(1:5)),
                 selectInput(inputId = "major_4", label = "Major:", choices = major_options[-1]),
                
-                selectInput(inputId = "course_grade_4_1", label = "73230:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_4_2", label = "73240:", choices = letter_grades_transfer),
-                selectInput(inputId = "course_grade_4_3", label = "73274:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_4_1", label = "21241:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_4_2", label = "21256:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_4_3", label = "36225:", choices = letter_grades_transfer),
                               
                 numericInput(inputId = "units_carried_4", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
                
                 numericInput(inputId = "cum_gpa_4", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
                 numericInput(inputId = "major_gpa_4", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
+             ),
+             
+             conditionalPanel(
+               condition = "input.course_outcome == '36401'",
+               
+                selectInput(inputId = "class_id_5", label = "Class:", choices = as.character(1:5)),
+                selectInput(inputId = "major_5", label = "Major:", choices = major_options[-1]),
+               
+                selectInput(inputId = "course_grade_5_1", label = "21241:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_5_2", label = "36225:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_5_3", label = "36226:", choices = letter_grades_transfer),
+                              
+                numericInput(inputId = "units_carried_5", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
+               
+                numericInput(inputId = "cum_gpa_5", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
+                numericInput(inputId = "major_gpa_5", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
+             ),
+             
+             conditionalPanel(
+               condition = "input.course_outcome == '36402'",
+               
+                selectInput(inputId = "class_id_6", label = "Class:", choices = as.character(1:5)),
+                selectInput(inputId = "major_6", label = "Major:", choices = major_options[-1]),
+               
+                selectInput(inputId = "course_grade_6_1", label = "36225:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_6_2", label = "36226:", choices = letter_grades_transfer),
+                selectInput(inputId = "course_grade_6_3", label = "36401:", choices = letter_grades_transfer),
+                              
+                numericInput(inputId = "units_carried_6", label = "Units Carried:", value = 0, min = 0, max = 100, step = 1),
+               
+                numericInput(inputId = "cum_gpa_6", label = "Cumulative GPA:", value = 0, min = 0, max = 4, step = 0.01),
+                numericInput(inputId = "major_gpa_6", label = "Major GPA:", value = 0, min = 0, max = 4, step = 0.01)
              ),
              
              actionButton(inputId = "go", label = "Predict"),
@@ -1309,35 +1340,43 @@ ui =  navbarPage(title = div(img(
              bsTooltip(id = "class_id_2", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
              bsTooltip(id = "class_id_3", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
              bsTooltip(id = "class_id_4", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
+             bsTooltip(id = "class_id_5", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
+             bsTooltip(id = "class_id_6", title = "Input Class (e.g., Freshman = 1, Sophmore = 2)"),
 
              bsTooltip(id = "major_1", title = "Input Student\\'s Major"),
              bsTooltip(id = "major_2", title = "Input Student\\'s Major"),
              bsTooltip(id = "major_3", title = "Input Student\\'s Major"),
              bsTooltip(id = "major_4", title = "Input Student\\'s Major"),
+             bsTooltip(id = "major_5", title = "Input Student\\'s Major"),
+             bsTooltip(id = "major_6", title = "Input Student\\'s Major"),
              
              bsTooltip(id = "units_carried_1", title = "Input Units Carried During Semester of Predicted Course"),
              bsTooltip(id = "units_carried_2", title = "Input Units Carried During Semester of Predicted Course"),
              bsTooltip(id = "units_carried_3", title = "Input Units Carried During Semester of Predicted Course"),
              bsTooltip(id = "units_carried_4", title = "Input Units Carried During Semester of Predicted Course"),
+             bsTooltip(id = "units_carried_5", title = "Input Units Carried During Semester of Predicted Course"),
+             bsTooltip(id = "units_carried_6", title = "Input Units Carried During Semester of Predicted Course"),
              
              bsTooltip(id = "cum_gpa_1", title = "Input Cumulative GPA (Find on SIO)"),
              bsTooltip(id = "cum_gpa_2", title = "Input Cumulative GPA (Find on SIO)"),
              bsTooltip(id = "cum_gpa_3", title = "Input Cumulative GPA (Find on SIO)"),
              bsTooltip(id = "cum_gpa_4", title = "Input Cumulative GPA (Find on SIO)"),
+             bsTooltip(id = "cum_gpa_5", title = "Input Cumulative GPA (Find on SIO)"),
+             bsTooltip(id = "cum_gpa_6", title = "Input Cumulative GPA (Find on SIO)"),
              
              bsTooltip(id = "major_gpa_1", title = "Input Major GPA (Find on Stellic)"),
              bsTooltip(id = "major_gpa_2", title = "Input Major GPA (Find on Stellic)"),
              bsTooltip(id = "major_gpa_3", title = "Input Major GPA (Find on Stellic)"),
              bsTooltip(id = "major_gpa_4", title = "Input Major GPA (Find on Stellic)"),
+             bsTooltip(id = "major_gpa_5", title = "Input Major GPA (Find on Stellic)"),
+             bsTooltip(id = "major_gpa_6", title = "Input Major GPA (Find on Stellic)"),
              
              bsTooltip(id = "course_grade_1_1", title = "Input Course Grade"),
              bsTooltip(id = "course_grade_1_2", title = "Input Course Grade"),
-             bsTooltip(id = "course_grade_1_3", title = "Input Course Grade"),
-             
+
              bsTooltip(id = "course_grade_2_1", title = "Input Course Grade"),
              bsTooltip(id = "course_grade_2_2", title = "Input Course Grade"),
-             bsTooltip(id = "course_grade_2_3", title = "Input Course Grade"),
-             
+
              bsTooltip(id = "course_grade_3_1", title = "Input Course Grade"),
              bsTooltip(id = "course_grade_3_2", title = "Input Course Grade"),
              bsTooltip(id = "course_grade_3_3", title = "Input Course Grade"),
@@ -1346,11 +1385,21 @@ ui =  navbarPage(title = div(img(
              bsTooltip(id = "course_grade_4_2", title = "Input Course Grade"),
              bsTooltip(id = "course_grade_4_3", title = "Input Course Grade"),
              
+             bsTooltip(id = "course_grade_5_1", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_5_2", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_5_3", title = "Input Course Grade"),
+             
+             bsTooltip(id = "course_grade_6_1", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_6_2", title = "Input Course Grade"),
+             bsTooltip(id = "course_grade_6_3", title = "Input Course Grade"),
+             
              bsTooltip(id = "go", title = "Run Prediction")
             ),                         
     
   mainPanel(plotOutput("plot1"),
+            textOutput("text1234"),
             textOutput("text123"), #test for action button
+            dataTableOutput("data_table_123"),
     tags$head(tags$style("#text1{color: black;
                                  font-size: 20px;
                                  font-style: italic;
@@ -1517,9 +1566,95 @@ ui =  navbarPage(title = div(img(
 
 ```{r}
 #server (navbar)
+#Bug: Predict() Function is not outputting anything, issue with how the inputs are being entered/read
+
 server = function(input,output){
 
   #tables
+  
+  ##For the modeling output, 
+  ##(1) Calls to unique inputs in ifelse statements to store reactive output
+  ##(2) Place output in predictive model function to take an EV grade and construct a ggplot bar chart of grade probabilities
+  ##(3) Make this output some object and connect it to the predict button (create all the output behind the scenes and then just show it when the predict button is clicked)
+
+  x_value = reactive(
+    
+    if(input$course_outcome == "15122"){
+      
+      c(input$class_id_1, input$major_1, input$units_carried_1, input$course_grade_1_1, input$course_grade_1_2,
+        input$cum_gpa_1, input$major_gpa_1)
+      
+      } else
+          
+    if(input$course_outcome == "15351"){
+          
+      c(input$class_id_2, input$major_2, input$units_carried_2, input$course_grade_2_1, input$course_grade_2_2, 
+        input$cum_gpa_2, input$major_gpa_2)
+          
+      } else
+                        
+    if(input$course_outcome == "36225"){
+                          
+      c(input$class_id_3, input$major_3, input$units_carried_3, input$course_grade_3_2, input$course_grade_3_1, input$course_grade_3_3, 
+        input$cum_gpa_3, input$major_gpa_3)
+              
+      } else
+                          
+    if(input$course_outcome == "36226"){
+        
+      c(input$class_id_4, input$major_4, input$units_carried_4, input$course_grade_4_1, input$course_grade_4_2, input$course_grade_4_3,
+        input$cum_gpa_4, input$major_gpa_4)
+        
+      } else
+        
+    if(input$course_outcome == "36401"){
+      
+      c(input$class_id_5, input$major_5, input$units_carried_5, input$course_grade_5_2, input$course_grade_5_3, input$course_grade_5_1,
+        input$cum_gpa_5, input$major_gpa_5)
+      
+      } else
+          
+    if(input$course_outcome == "36402"){
+          
+      c(input$class_id_6, input$major_6, input$units_carried_6, input$course_grade_6_1, input$course_grade_6_2, input$course_grade_6_3,
+        input$cum_gpa_6, input$major_gpa_6)
+          
+      }
+  )
+  
+  #Make x_values readable for the predict function
+  features = reactive(getFeatures(input$course_outcome)) 
+  
+  x_value_df = reactive({ #create df and set colnames within one reactive element
+    
+    new_table = data.frame(matrix(nrow = 1, data = x_value()))
+    colnames(new_table) = features()
+    new_table
+    
+    })
+  
+  #model_ouput_shiny = reactive({
+    
+   # model_values = predict(input$course_outcome, x_value_df())
+    
+   # model_values[[1]]
+    
+  #})
+  
+  #Pred Model Graph df
+  #for when Predict() is working
+  
+  # graph_df = reactive({
+  #   
+  #   graph_table = data.frame(grade_char = c("A", "B", "C", "D"), grade_probabilities = model_ouput_shiny())
+  #   
+  #   graph_table
+  # })
+  
+  #Test Data Table
+  
+  output$data_table_123 <- renderDataTable({x_value_df()})
+  
   output$table1 <- renderText({top_n_course_by_major(n_course = input$n_course)})
   
   output$table2 <- renderText({course_performance_by_major_table(course_n = input$course_id_by_major)}) 
@@ -1528,43 +1663,10 @@ server = function(input,output){
 
   #text
 
-  ##For the modeling output, 
-  ##(1) Calls to unique inputs in ifelse statements to store reactive output
-  ##(2) Place output in predictive model function to take an EV grade and construct a ggplot bar chart of grade probabilities
-  ##(3) Make this output some object and connect it to the predict button (create all the output behind the scenes and then just show it when the predict button is clicked)
-  
-  x_value = reactive(
-    
-    if(input$course_outcome == "36402"){
-      
-      c(input$class_id_1, input$major_1, input$course_grade_1_1, input$course_grade_1_2, input$course_grade_1_3, input$units_carried_1,
-        input$cum_gpa_1, input$major_gpa_1)
-      
-      } else
-          
-    if(input$course_outcome == "36401"){
-          
-      c(input$class_id_2, input$major_2, input$course_grade_2_1, input$course_grade_2_2, input$course_grade_2_3, input$units_carried_2,
-        input$cum_gpa_2, input$major_gpa_2)
-          
-      } else
-                        
-    if(input$course_outcome == "73374"){
-                          
-      c(input$class_id_3, input$major_3, input$course_grade_3_1, input$course_grade_3_2, input$course_grade_3_3, input$units_carried_3, 
-        input$cum_gpa_3, input$major_gpa_3)
-              
-      } else
-                          
-    if(input$course_outcome == "15351"){
-        
-      c(input$class_id_4, input$major_4, input$course_grade_4_1, input$course_grade_4_2, input$course_grade_4_3, input$units_carried_4,
-        input$cum_gpa_4, input$major_gpa_4)
-        
-      }
-  )
-  
   #predict(input$course_outcome, x_value()) #put y_value in first argument
+  
+  output$text1234 <- eventReactive(input$go, {getFeatures(input$course_outcome)})
+  
   output$text123 <- eventReactive(input$go, {paste(x_value())}) #the (), in x_value(), allows you to get the value of the reactive element
     
   output$text1 <- renderText({paste("Your expected grade is:", grade_ev_func())})
@@ -1580,6 +1682,17 @@ server = function(input,output){
   output$text2_R <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[5]})
   
   #plots
+  #Plot for when the predict() output is working
+  # output$plot1 <- renderPlot({
+  #   
+  #   ggplot(graph_df(), aes(x = grade_char, y = grade_probabilities)) +
+  #     geom_col(col = "Black", fill = "Steelblue") +
+  #     scale_x_discrete(limits = c("D or R", "C", "B", "A" )) +
+  #     coord_flip() +
+  #     labs(title = "Predicted Grade Distribution", x = "Letter Grades", y = "Probability")
+  #   
+  # }, height = 400, width = 900)
+  
   output$plot1 <- renderPlot({
     grade_dist_plot_func()
     }, height = 400, width = 900)
