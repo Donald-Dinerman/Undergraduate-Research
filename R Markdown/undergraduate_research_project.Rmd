@@ -1089,114 +1089,36 @@ course_type = c("Core", "Elective")
 course_range = c("362xx", "363xx", "364xx")
 ```
 
-## Model
-
-Outcome: Distribution of grades Question: How would we check accuracy on test set if outcome is distribution? Wouldn't it have to be definitive like A B or at least an E(Distribution) like 3.35?
-
-Need to create wide formatted data, filtered by students who fulfilled the outcome course plus the respective pre-reqs(or mandatory courses)
-
-Can include GPA of the semester prior to taking the outcome course in the wide data
-
-colnames: student major pre-req 1, pr2, pr3, outcome, qpa 
-
-values: id # ,    major, grade, grade, grade, grade, qpa #
-
-```{r}
-model_df_func = function(response_course, predictor_courses){
-  
-  filtered_courses = c(response_course, predictor_courses)
-                     
-  long_df = df_2 %>% #Note that the base df here is df_2. This may change in the future as we add more transfer credit courses
-    group_by(student) %>%
-    filter(all(filtered_courses %in% course)) %>% #only take students if they have all of filtered courses
-    filter(course %in% filtered_courses & grade %in% letter_grades) %>% #filter to the filtered courses with letter grades
-    select(student, major, course, grade, semester, updating_total_QPA)
-
-#Retains students with retakes by taking their latest course performance
-  retake_remedy = long_df %>%
-    group_by(student, course) %>%
-    slice_min(n = 1, order_by = semester)
-
-  full_students = retake_remedy %>%
-    group_by(student) %>%
-    summarise(count = n()) %>% #check why I am getting students with 2/3 classes, doesn't matter cuz filter out but still want to know
-    filter(count == length(filtered_courses)) %>%
-    pull(1)
-
-  QPA_values = retake_remedy %>%
-    filter(student %in% full_students) %>%
-    group_by(student) %>%
-    slice(length(filtered_courses) - 1) %>% #this should be ok bc you wouldn't select a pred course in the same sem as outcome
-    pull(6)
-
-  example_model_df = retake_remedy %>%
-    filter(student %in% full_students) %>%
-    select(student, major, course, grade) %>%
-    pivot_wider(names_from = course, values_from = grade) %>%
-    cbind(QPA = QPA_values)
-
-  example_model_df
-
-}
-
-test_sample_size = function(resp_course, pred_course) {
-  
-model_df_func(response_course = resp_course, predictor_courses = pred_course) %>% nrow()
-  
-}
-
-# test_sample_size(36402, c(21256, 36225, 36226, 36401))
-# 
-# test_sample_size(36401, c(21256, 36225, 36226))
-# 
-# test_sample_size(36226, c(21256, 36225, 36202)) #can take 36202 out (discretion depending on model accuracy)
-# 
-# test_sample_size(36225, c(21256, 36202))
-# 
-# test_sample_size(15122, c(15112, 21127)) #can add 36225 but these other two courses seemed more meaningful for predicting 15122
-# 
-# test_sample_size(36350, c(36225, 36226))
-```
-## FIND RESPONSE PREDICTOR COMBOS W GOOD  SAMPLE SIZES
-
 ## Shiny App
 
-Make preliminary Shiny App that can at least host the functional EDA for now
-
-cheat sheet: https://shiny.rstudio.com/images/shiny-cheatsheet.pdf
+Shiny App that can host the model and functional EDA
 
 ```{r}
-#example grade distribution (non-reactive
-#going to have to create reactive element dependent on 
-letter_grades = c("A", "B", "C", "D", "R")
+#Python Conversion Script
+## check predict.py and models/ folder exists
+## running this line would give you two functions:
+## getFeatures(course_number) and predict(course_number, df)
+## note there are python module dependencies: pandas and other modules
+## also need to install either miniconda or anaconda using a path with no spaces
+
+library(reticulate)
+use_virtualenv("venv")
+source_python("predict.py")
+```
+
+```{r}
+#EV grade calculator
+letter_grades = c("A", "B", "C", "D")
 
 letter_grades_transfer = c(letter_grades, "T")
 
-grade_prob = c(0.5, 0.3, 0.1, 0.05, 0.05) #this information from model; model will have to be reactive to outcome course selection
-
-grade_df = data.frame(letter_grades, grade_prob)
-
-grade_dist_plot_func = function(df = grade_df){
-
-  positions = df %>% pull(1) %>% rev()
-
-  p = ggplot(df, aes(x = letter_grades, y = grade_prob)) +
-    geom_col(col = "Black", fill = "Steelblue") +
-    scale_x_discrete(limits = positions) +
-    coord_flip() +
-    labs(title = "Predicted Grade Distribution", x = "Letter Grades", y = "Probability")
-  
-  print(p)
-}
-
-grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
+grade_ev_func = function(letter = letter_grades, probabilities){
   
   numeric_grades = case_when(
     letter == "A" ~ 4,
     letter == "B" ~ 3,
     letter == "C" ~ 2,
-    letter == "D" ~ 1,
-    letter == "R" ~ 0,
+    letter == "D" ~ 1
   )
 
   grade_ev = sum(numeric_grades * probabilities) %>% round(2)
@@ -1204,17 +1126,15 @@ grade_ev_func = function(letter = letter_grades, probabilities = grade_prob){
   grade_ev
 }
 
-#grade_dist_plot_func()
 #grade_ev_func()
 ```
 
 ```{r}
+#cheat sheet: https://shiny.rstudio.com/images/shiny-cheatsheet.pdf
 #Navbar ui: (https://shiny.rstudio.com/gallery/navbar-example.html)
 #Dynamic ui: (https://shiny.rstudio.com/articles/dynamic-ui.html)
 #Shiny Themes: (https://rstudio.github.io/shinythemes/)
 #Shiny Tutorial: (https://shiny.rstudio.com/tutorial/written-tutorial/lesson1/)
-#Bugs: not locating local image file, major tooltip not working
-#Image workaround: Use image url location instead of local
 #Find image test: title = div(tags$img(src = "cmu-stat-ds.png", alt = "Error", deleteFile = F), "Stat and DS Advising")
 
 top_four_outcome_pred = c(15122, 15351, 36225, 36226, 36401, 36402)
@@ -1397,12 +1317,9 @@ ui =  navbarPage(title = div(img(
             ),                         
     
   mainPanel(plotOutput("plot1"),
-            textOutput("text1234"),
-            textOutput("text123"), #test for action button
-            dataTableOutput("data_table_123"),
+            uiOutput("text1"),
     tags$head(tags$style("#text1{color: black;
                                  font-size: 20px;
-                                 font-style: italic;
                                  }"
                          )))))
   ),
@@ -1566,58 +1483,50 @@ ui =  navbarPage(title = div(img(
 
 ```{r}
 #server (navbar)
-#Bug: Predict() Function is not outputting anything, issue with how the inputs are being entered/read
 
 server = function(input,output){
-
-  #tables
-  
-  ##For the modeling output, 
-  ##(1) Calls to unique inputs in ifelse statements to store reactive output
-  ##(2) Place output in predictive model function to take an EV grade and construct a ggplot bar chart of grade probabilities
-  ##(3) Make this output some object and connect it to the predict button (create all the output behind the scenes and then just show it when the predict button is clicked)
 
   x_value = reactive(
     
     if(input$course_outcome == "15122"){
       
-      c(input$class_id_1, input$major_1, input$units_carried_1, input$course_grade_1_1, input$course_grade_1_2,
+      c(as.numeric(input$class_id_1), input$major_1, input$units_carried_1, input$course_grade_1_1, input$course_grade_1_2,
         input$cum_gpa_1, input$major_gpa_1)
       
       } else
           
     if(input$course_outcome == "15351"){
           
-      c(input$class_id_2, input$major_2, input$units_carried_2, input$course_grade_2_1, input$course_grade_2_2, 
+      c(as.numeric(input$class_id_2), input$major_2, input$units_carried_2, input$course_grade_2_1, input$course_grade_2_2, 
         input$cum_gpa_2, input$major_gpa_2)
           
       } else
                         
     if(input$course_outcome == "36225"){
                           
-      c(input$class_id_3, input$major_3, input$units_carried_3, input$course_grade_3_2, input$course_grade_3_1, input$course_grade_3_3, 
-        input$cum_gpa_3, input$major_gpa_3)
+      c(as.numeric(input$class_id_3), input$major_3, input$units_carried_3, input$course_grade_3_2, input$course_grade_3_1,
+        input$course_grade_3_3, input$cum_gpa_3, input$major_gpa_3)
               
       } else
                           
     if(input$course_outcome == "36226"){
         
-      c(input$class_id_4, input$major_4, input$units_carried_4, input$course_grade_4_1, input$course_grade_4_2, input$course_grade_4_3,
-        input$cum_gpa_4, input$major_gpa_4)
+      c(as.numeric(input$class_id_4), input$major_4, input$units_carried_4, input$course_grade_4_1, input$course_grade_4_2,
+        input$course_grade_4_3, input$cum_gpa_4, input$major_gpa_4)
         
       } else
         
     if(input$course_outcome == "36401"){
       
-      c(input$class_id_5, input$major_5, input$units_carried_5, input$course_grade_5_2, input$course_grade_5_3, input$course_grade_5_1,
-        input$cum_gpa_5, input$major_gpa_5)
+      c(as.numeric(input$class_id_5), input$major_5, input$units_carried_5, input$course_grade_5_2, input$course_grade_5_3,
+        input$course_grade_5_1, input$cum_gpa_5, input$major_gpa_5)
       
       } else
           
     if(input$course_outcome == "36402"){
           
-      c(input$class_id_6, input$major_6, input$units_carried_6, input$course_grade_6_1, input$course_grade_6_2, input$course_grade_6_3,
-        input$cum_gpa_6, input$major_gpa_6)
+      c(as.numeric(input$class_id_6), input$major_6, input$units_carried_6, input$course_grade_6_1, input$course_grade_6_2,
+        input$course_grade_6_3, input$cum_gpa_6, input$major_gpa_6)
           
       }
   )
@@ -1633,27 +1542,36 @@ server = function(input,output){
     
     })
   
-  #model_ouput_shiny = reactive({
+  graph_df = reactive({ #transform probability list into df for plot
+
+   model_values = predict(input$course_outcome, x_value_df())
+
+   y_var = model_values[[2]] %>% as.data.frame() %>% t()
+   
+   graph_table = data.frame(grade_char = c("A", "B", "C", "D"), grade_probabilities = y_var)
+   
+   graph_table
+
+  })
+  
+  char_ev_grade_value = reactive({ #get max prob letter grade list item
+
+   model_values = predict(input$course_outcome, x_value_df())
+
+   model_values[[1]]
+
+  })
+  
+  num_ev_grade_value = reactive({
     
-   # model_values = predict(input$course_outcome, x_value_df())
+    model_values = predict(input$course_outcome, x_value_df())
+
+    grade_probs = model_values[[2]] %>% as.data.frame() %>% t() %>% as.vector()
     
-   # model_values[[1]]
-    
-  #})
+    grade_ev_func(probabilities = grade_probs)
+  })
   
-  #Pred Model Graph df
-  #for when Predict() is working
-  
-  # graph_df = reactive({
-  #   
-  #   graph_table = data.frame(grade_char = c("A", "B", "C", "D"), grade_probabilities = model_ouput_shiny())
-  #   
-  #   graph_table
-  # })
-  
-  #Test Data Table
-  
-  output$data_table_123 <- renderDataTable({x_value_df()})
+  #Table
   
   output$table1 <- renderText({top_n_course_by_major(n_course = input$n_course)})
   
@@ -1662,14 +1580,14 @@ server = function(input,output){
   output$table3 <- renderText({top_n_retake_tab(n_retake = input$n_retake)})
 
   #text
-
-  #predict(input$course_outcome, x_value()) #put y_value in first argument
   
-  output$text1234 <- eventReactive(input$go, {getFeatures(input$course_outcome)})
+  grade_reactive <- eventReactive(input$go, #put the expected grade text together
+    {
+      paste("Your expected grade is:", char_ev_grade_value(), "(", num_ev_grade_value(), ")") %>% 
+        gsub("[[:space:]](?=[^()]*\\))", "", ., perl = T) #remove space within parentheses
+      })
   
-  output$text123 <- eventReactive(input$go, {paste(x_value())}) #the (), in x_value(), allows you to get the value of the reactive element
-    
-  output$text1 <- renderText({paste("Your expected grade is:", grade_ev_func())})
+  output$text1 <- renderUI({grade_reactive()})
   
   output$text2_A <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[1]})
   
@@ -1682,19 +1600,22 @@ server = function(input,output){
   output$text2_R <- renderText({compare_grades_text(input$course_id_comparative_1, input$course_id_comparative_2)[5]})
   
   #plots
-  #Plot for when the predict() output is working
-  # output$plot1 <- renderPlot({
-  #   
-  #   ggplot(graph_df(), aes(x = grade_char, y = grade_probabilities)) +
-  #     geom_col(col = "Black", fill = "Steelblue") +
-  #     scale_x_discrete(limits = c("D or R", "C", "B", "A" )) +
-  #     coord_flip() +
-  #     labs(title = "Predicted Grade Distribution", x = "Letter Grades", y = "Probability")
-  #   
-  # }, height = 400, width = 900)
+
+  predict_plot <- eventReactive(input$go, 
+    
+        {
+          ggplot(graph_df(), aes(x = grade_char, y = grade_probabilities)) +
+            geom_col(col = "Black", fill = "Steelblue") +
+            scale_x_discrete(limits = c("D", "C", "B", "A" )) +
+            coord_flip() +
+            labs(title = "Predicted Grade Distribution", x = "Letter Grades", y = "Probability")
+        }
+    )
   
   output$plot1 <- renderPlot({
-    grade_dist_plot_func()
+
+        predict_plot()
+
     }, height = 400, width = 900)
     
   output$plot2 <- renderPlot({
