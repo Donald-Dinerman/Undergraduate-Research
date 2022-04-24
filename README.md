@@ -9,7 +9,7 @@ team to create data-backed insights that will support
 advising recommendations.
 
 We designed predictive models using random forests 
-that takes in a student's academic history and predicts 
+that take in students' academic history and predicts 
 their future course performance.
 
 Our dataset includes course performance data
