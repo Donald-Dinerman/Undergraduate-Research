@@ -765,10 +765,30 @@ retake_course_grade_func =  function(class, label = F){
 ```
 
 ```{r}
-#EDA Functions (Emily)
+# get data frame that just has last takes of all classes
+df = read.csv("wrangled_data.csv")
 
-# graph function to compare grades of 2 classes
+n_students = df$student %>% unique() %>% length()
+
+course_counts = df %>%
+  group_by(student, course) %>%
+  summarise(times_taken = n())
+
+complete = left_join(df, course_counts, by = c("student", "course"))
+
+last_takes = complete %>%
+  group_by(student, course) %>%
+  slice_max(n = 1, order_by = semester)
+
+last_takes = as.data.frame(subset(last_takes, select = c(student, semester, course, grade, times_taken)))
+
+last_takes$grade = as.character(last_takes$grade)
+last_takes$student = as.character(last_takes$student)
+```
+
+```{r}
 get_course_df <- function(course_num, df) {
+  
   if (course_num %in% c(36217, 36218, 36219, 36225, 21325, 15259)) {
     df_course = df[df$course %in% c(36217, 36218, 36219, 36225, 21325, 15259),]
   }
@@ -793,82 +813,18 @@ get_course_df <- function(course_num, df) {
   return(df_course)
 }
 
-get_students <- function(df1, df2) {
-  df1$student = as.character(df1$student)
-  df2$student = as.character(df2$student)
-  students1 = df1$student
-  students2 = df2$student
-  students = intersect(students1, students2)
-  return(students)
-}
-
-is_after <- function(sem1, sem2) {
-  year1 = substr(sem1, 2, 3)
-  s1 = substr(sem1, 1, 1)
-  year2 = substr(sem2, 2, 3)
-  s2 = substr(sem2, 1, 1)
-  if (year1 > year2) {
-    return(TRUE)
-  }
-  if (year1 < year2) {
-    return(FALSE)
-  }
-  if (s1 == "S") {
-    return(FALSE)
-  }
-  if (s2 == "S") {
-    return(TRUE)
-  }
-  if (s1 == "F") {
-    return(TRUE)
-  }
-  if (s2 == "F") {
-    return(FALSE)
-  }
-  if (s1 == "M") { # s2 is N
-    return(FALSE)
-  }
-  return(TRUE) # s1 is N, s2 is M
-}
-
-get_last_semester <- function(df) {
-  semesters = df$semester
-  last_semester = semesters[1]
-  for (i in 2:length(semesters)) {
-    sem = semesters[i]
-    if (is_after(sem, last_semester) == TRUE) {
-      last_semester = sem
-    }
-  }
-  return(last_semester)
-}
-
-remove_repeats <- function(df) {
-  students = get_students(df, df)
-  for (i in 1:length(students)) {
-    s = students[i]
-    rows = df[df["student"] == s, ]
-    if (nrow(rows) > 1) {
-      last_semester = get_last_semester(rows)
-      df = df[!(df["student"] == s & df["semester"] != last_semester), ]
-    }
-  }
-  return(df)
-}
-
 compare_grades_plot <- function(course1, course2) {
-  df = read.csv("wrangled_data.csv")
-  df$grade = as.character(df$grade)
   
-  df1 = get_course_df(course1, df)
-  df1 = remove_repeats(df1)
-  df2 = get_course_df(course2, df)
-  df2 = remove_repeats(df2)
+  df$grade = as.character(df$grade)
+  df$student = as.character(df$student)
+  
+  df1 = get_course_df(course1, last_takes)
+  df2 = get_course_df(course2, last_takes)
   
   course1_grades = rep(NA, nrow(df2))
   for (i in 1:nrow(df2)) {
-    s = df2[i,"student"]
-    row1 = df1[df1$student == s,]
+    s = df2[i, ]$student
+    row1 = df1[df1$student == s, ]
     if (nrow(row1) > 0) {
       course1_grades[i] = row1[1,"grade"]
     }
@@ -876,27 +832,25 @@ compare_grades_plot <- function(course1, course2) {
 
   df2$course1_grade = course1_grades
   df2 = df2 %>% drop_na(course1_grade)
-  # df2 = get_letter_grade(df2, "course1_grade")
   
   xlabel = paste("Grade in", as.character(course1))
   ylabel = paste("Proportion of Grades in", as.character(course2))
   leglabel = paste("Grade in", as.character(course2))
   
-  ggplot(df2, aes(x=course1_grade, fill = grade)) +
-    geom_bar(position = "fill", col =  "black") +
+  ggplot(df2, aes(x=course1_grade, fill=grade)) +
+    geom_bar(position="fill") +
     xlab(xlabel) +
     ylab(ylabel) +
     scale_fill_discrete(name = leglabel)
 }
 
-#compare_grades_plot(36225, 36225)
+#compare_grades_plot(36225, 36226)
 ```
 
 ```{r}
-#text output function
-
 # text for comparing grades of 2 classes
 get_course_df <- function(course_num, df) {
+  
   if (course_num %in% c(36217, 36218, 36219, 36225, 21325, 15259)) {
     df_course = df[df$course %in% c(36217, 36218, 36219, 36225, 21325, 15259),]
   }
@@ -921,78 +875,13 @@ get_course_df <- function(course_num, df) {
   return(df_course)
 }
 
-get_students <- function(df1, df2) {
-  df1$student = as.character(df1$student)
-  df2$student = as.character(df2$student)
-  students1 = df1$student
-  students2 = df2$student
-  students = intersect(students1, students2)
-  return(students)
-}
-
-is_after <- function(sem1, sem2) {
-  year1 = substr(sem1, 2, 3)
-  s1 = substr(sem1, 1, 1)
-  year2 = substr(sem2, 2, 3)
-  s2 = substr(sem2, 1, 1)
-  if (year1 > year2) {
-    return(TRUE)
-  }
-  if (year1 < year2) {
-    return(FALSE)
-  }
-  if (s1 == "S") {
-    return(FALSE)
-  }
-  if (s2 == "S") {
-    return(TRUE)
-  }
-  if (s1 == "F") {
-    return(TRUE)
-  }
-  if (s2 == "F") {
-    return(FALSE)
-  }
-  if (s1 == "M") { # s2 is N
-    return(FALSE)
-  }
-  return(TRUE) # s1 is N, s2 is M
-}
-
-get_last_semester <- function(df) {
-  semesters = df$semester
-  last_semester = semesters[1]
-  for (i in 2:length(semesters)) {
-    sem = semesters[i]
-    if (is_after(sem, last_semester) == TRUE) {
-      last_semester = sem
-    }
-  }
-  return(last_semester)
-}
-
-remove_repeats <- function(df) {
-  students = get_students(df, df)
-  for (i in 1:length(students)) {
-    s = students[i]
-    rows = df[df["student"] == s, ]
-    if (nrow(rows) > 1) {
-      last_semester = get_last_semester(rows)
-      df = df[!(df["student"] == s & df["semester"] != last_semester), ]
-    }
-  }
-  return(df)
-}
-
 compare_grades_text <- function(course1, course2) {
   
   df = read.csv("wrangled_data.csv")
   df$grade = as.character(df$grade)
   
-  df1 = get_course_df(course1, df)
-  df1 = remove_repeats(df1)
-  df2 = get_course_df(course2, df)
-  df2 = remove_repeats(df2)
+  df1 = get_course_df(course1, last_takes)
+  df2 = get_course_df(course2, last_takes)
   
   course1_grades = rep(NA, nrow(df2))
   for (i in 1:nrow(df2)) {
@@ -1008,7 +897,6 @@ compare_grades_text <- function(course1, course2) {
   
   text = rep(" ", 5)
   grades = c("A", "B", "C", "D", "R")
-
   for (i in 1:5) {
     grade_df = df2[df2["course1_grade"] == grades[i], ]
     denom = nrow(grade_df)
@@ -1026,7 +914,7 @@ compare_grades_text <- function(course1, course2) {
   text
 }
 
-#compare_grades_text(36315, 36226)
+#compare_grades_text(36225, 36226)
 ```
 
 ```{r}
@@ -1096,11 +984,21 @@ Shiny App that can host the model and functional EDA
 ```{r}
 #Python Conversion Script
 ## check predict.py and models/ folder exists
-## running this line would give you two functions:
+## source_python("predict.py") gives you two functions:
 ## getFeatures(course_number) and predict(course_number, df)
 ## note there are python module dependencies: pandas and other modules
-## also need to install either miniconda or anaconda using a path with no spaces
+## also need to install either miniconda or anaconda using a path with no spaces to use reticulate library (you will be prompted to do this in the console when running the source_python() function)
 
+#Uncomment the code below (7 lines), this code creates a virtual environment with the necessary dependencies
+#library(reticulate)
+#version <- "3.8.7"
+#install_python(version = version) #only need to run this once
+#virtualenv_create("r-reticulate", python_version = version) #only need to run this once
+#virtualenv_install("r-reticulate", packages=c("scikit-learn", 'pandas')) #only need to run this once
+#use_virtualenv("r-reticulate")
+#source_python("predict.py")
+
+#Comment the code below (3 lines), I already have the dependencies installed so I don't need that commented code above
 library(reticulate)
 use_virtualenv("venv")
 source_python("predict.py")
@@ -1125,8 +1023,6 @@ grade_ev_func = function(letter = letter_grades, probabilities){
 
   grade_ev
 }
-
-#grade_ev_func()
 ```
 
 ```{r}
@@ -1381,7 +1277,7 @@ ui =  navbarPage(title = div(img(
  
     )
   )),
-  #Emily EDA Function
+  #Emily EDA
       tabPanel("Comparative Course Performance",
              
        fluidPage(
@@ -1534,7 +1430,7 @@ server = function(input,output){
   #Make x_values readable for the predict function
   features = reactive(getFeatures(input$course_outcome)) 
   
-  x_value_df = reactive({ #create df and set colnames within one reactive element
+  x_value_df <- reactive({ #create df and set colnames within one reactive element
     
     new_table = data.frame(matrix(nrow = 1, data = x_value()))
     colnames(new_table) = features()
@@ -1542,7 +1438,7 @@ server = function(input,output){
     
     })
   
-  graph_df = reactive({ #transform probability list into df for plot
+  graph_df <- reactive({ #transform probability list into df for plot
 
    model_values = predict(input$course_outcome, x_value_df())
 
@@ -1554,7 +1450,7 @@ server = function(input,output){
 
   })
   
-  char_ev_grade_value = reactive({ #get max prob letter grade list item
+  char_ev_grade_value <- reactive({ #get max prob letter grade list item
 
    model_values = predict(input$course_outcome, x_value_df())
 
@@ -1562,7 +1458,7 @@ server = function(input,output){
 
   })
   
-  num_ev_grade_value = reactive({
+  num_ev_grade_value <- reactive({
     
     model_values = predict(input$course_outcome, x_value_df())
 
