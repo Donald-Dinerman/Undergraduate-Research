@@ -2,7 +2,7 @@
 # Undergradute Research
 
 
-*See the project's poster presentation [here](https://donald-dinerman.github.io/Undergraduate-Research/)*.
+*See the project's poster presentation [here](https://donald-dinerman.github.io/Undergraduate-Research/FinalPoster.pdf)*.
 
 We worked with Carnegie Mellon's Statistics Advising
 team to create data-backed insights that will support
