@@ -2,9 +2,9 @@
 # Undergradute Research
 
 
-*See the fully knitted project [here](https://donald-dinerman.github.io/Undergraduate-Research/)*. (Make repo public to enable Github Pages).
+*See the project's poster presentation [here](https://donald-dinerman.github.io/Undergraduate-Research/)*. (Make repo public to enable Github Pages).
 
-We worked with Carnegie Mellon's Statistics Adivising
+We worked with Carnegie Mellon's Statistics Advising
 team to create data-backed insights that will support
 advising recommendations.
 
@@ -20,10 +20,14 @@ to visualize course grade distributions, comparative
 course performance, course retake performance along with 
 other metrics.
 
-Lastly, we built a Shiny App to host the predictive modeling
+Lastly, we built a Shiny App to host predictive modeling
 and exploratory data analysis. Advisors can freely interact
 with the app and extract insights at their discretion.
 
+Given dependency complications with hosting the app on a
+non-local server and privacy constraints with student
+information, a poster presentation will be displayed in
+place of the app.
 
 ## Authors
 
